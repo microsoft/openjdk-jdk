@@ -1,1 +1,22 @@
-# TODO: Josh tie in our Azure DevOps pipelines here.
+name: "$(Year:yyyy).$(Month).$(BuildID)-ci"
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - main
+
+pr: none
+
+resources:
+  repositories:
+    - repository: openjdk_azure_devops_harness
+      type: git
+      name: github_move/openjdk-azure-devops-harness
+      ref: refs/heads/main
+
+variables:
+  JTREG_VERSION: "6.1"
+
+stages:
+  - template: /ci_main.yml@devops_demo
