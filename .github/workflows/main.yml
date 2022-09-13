@@ -30,6 +30,7 @@ on:
     branches-ignore:
       - main
       - pr/*
+      - ms-patches/*
   workflow_dispatch:
     inputs:
       platforms:
