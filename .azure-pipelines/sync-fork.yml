@@ -1,0 +1,54 @@
+parameters:
+  - name: fork_repo_url
+    displayName: fork_repo_url
+    default: https://github.com/microsoft/openjdk-jdk
+  - name: upstream_repo_url
+    displayName: upstream_repo_url
+    default: https://github.com/openjdk/jdk
+  - name: fork_branch
+    default: main
+    displayName: fork_branch
+  - name: upstream_branch
+    default: master 
+    displayName: upstream_branch
+
+trigger: none
+
+schedules:
+  # At 5am UTC (10pm PST) daily
+  - cron: "0 5 * * *"
+    displayName: Sync
+    always: false # only run if there has been code changes to the jdk codebase
+    branches:
+      include:
+        - "*"
+stages:
+- stage: sync
+  jobs:
+  - job: sync
+    displayName: "sync repository with upstream"
+
+    pool:
+      name: JEG-ubuntu20.04-x64-EO
+    
+    steps:    
+      - bash: |
+          fork_repo_url=${{ parameters.fork_repo_url }}
+          repourl="${fork_repo_url#https://github.com/schandra13/}"
+          echo "reponame is : $repourl"
+          echo "##vso[task.setvariable variable=FORK_FOLDER]$repourl"
+        displayName: "Fetch fork repo folder name"
+
+      - bash: |
+          git clone ${{ parameters.fork_repo_url }}
+          echo "Fork_Folder is : $(FORK_FOLDER)"
+          cd $(FORK_FOLDER)
+          git checkout ${{ parameters.fork_branch }} 
+          git remote add upstream ${{ parameters.upstream_repo_url }}
+          git fetch upstream
+          git merge --ff-only upstream/${{ parameters.upstream_branch }} 
+          git push https://schandra13:$PASSKEY@github.com/schandra13/$(FORK_FOLDER)
+        env:
+          PASSKEY: $(passkey)
+        displayName: "Sync fork with the upstream"
+
