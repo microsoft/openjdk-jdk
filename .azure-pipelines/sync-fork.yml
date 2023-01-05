@@ -43,6 +43,8 @@ stages:
         displayName: "git config" 
 
       - bash: |
+          # ${parameter/#pattern/string} If pattern is preceded by ‘#’ (the third form above), 
+          # it must match at the beginning of the expanded value of parameter
           fork_repo_url=$(FORK_REPO_URL)
           repourl="${fork_repo_url#https://github.com/schandra13/}"
           echo "reponame is : $repourl"
