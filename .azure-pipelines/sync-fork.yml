@@ -1,16 +1,15 @@
-parameters:
-  - name: fork_repo_url
-    displayName: fork_repo_url
-    default: https://github.com/microsoft/openjdk-jdk
-  - name: upstream_repo_url
-    displayName: upstream_repo_url
-    default: https://github.com/openjdk/jdk
-  - name: fork_branch
-    default: main
-    displayName: fork_branch
-  - name: upstream_branch
-    default: master 
-    displayName: upstream_branch
+#sync-fork.yml
+# To sync fork with the upstream repo and this is done on a schedule at 10 pm PST daily.To manually do the sync we follow the below steps 
+# and the same has been incorporated in a pipeline to make it automated.
+#Input params: we provide the fork repo url and the upstream repo url defined at pipeline definition and their branches to be synced
+# 1. git clone github.com/microsoft/x
+# 2.cd x
+# 3.git checkout main (our main branch)
+# 4.git remote add upstream github.com/upstream-org/x
+# 5.git fetch upstream
+# 6.git merge -ff only upstream/master (into our main branch)
+# 7.git push
+# $PASSKEY: Pipeline variable defined for PAT token that is saved as a secret in pipeline definition variable.
 
 trigger: none
 
@@ -22,8 +21,10 @@ schedules:
     branches:
       include:
         - "*"
+
 stages:
 - stage: sync
+  displayName: "Mirror upstream repo"
   jobs:
   - job: sync
     displayName: "sync repository with upstream"
@@ -31,24 +32,48 @@ stages:
     pool:
       name: JEG-ubuntu20.04-x64-EO
     
-    steps:    
+    steps:     
       - bash: |
-          fork_repo_url=${{ parameters.fork_repo_url }}
+          git config --global --add http.https://dev.azure.com.extraheader "AUTHORIZATION: bearer $(System.AccessToken)"
+          git config --global core.autocrlf input
+          git config --global user.email "javaplatinfra@microsoft.com"
+          git config --global user.name "JEG- $(Build.DefinitionName)"
+          # git config --global user.email "javaplatinfra@microsoft.com"
+          # git config --global user.name "JEG- $(Build.DefinitionName)"
+        displayName: "git config" 
+
+      - bash: |
+          fork_repo_url=$(FORK_REPO_URL)
           repourl="${fork_repo_url#https://github.com/schandra13/}"
           echo "reponame is : $repourl"
           echo "##vso[task.setvariable variable=FORK_FOLDER]$repourl"
         displayName: "Fetch fork repo folder name"
-
+  
       - bash: |
-          git clone ${{ parameters.fork_repo_url }}
+          git clone $(FORK_REPO_URL)
+        displayName: "Clone fork repository"
+      
+      - bash: |
           echo "Fork_Folder is : $(FORK_FOLDER)"
           cd $(FORK_FOLDER)
-          git checkout ${{ parameters.fork_branch }} 
-          git remote add upstream ${{ parameters.upstream_repo_url }}
+          git checkout $(FORK_BRANCH)
+        displayName: "Change directory to fork folder and checkout fork branch"     
+
+      - bash: |
+          cd $(FORK_FOLDER)
+          git remote add upstream $(UPSTREAM_REPO_URL)          
           git fetch upstream
-          git merge --ff-only upstream/${{ parameters.upstream_branch }} 
+          git merge --no-ff upstream/$(UPSTREAM_BRANCH)
+        displayName: "Fetch upstream and merge fast forward only"
+
+      - bash: |
+          cd $(FORK_FOLDER)
+          git checkout $(FORK_BRANCH)
           git push https://schandra13:$PASSKEY@github.com/schandra13/$(FORK_FOLDER)
         env:
-          PASSKEY: $(passkey)
-        displayName: "Sync fork with the upstream"
+          PASSKEY: $(passkey) # see header comment for details on $PASSKEY.
+        displayName: "Git push"
+
+      
+          
 
