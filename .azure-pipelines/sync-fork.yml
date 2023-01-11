@@ -45,8 +45,9 @@ stages:
       - bash: |
           # ${parameter/#pattern/string} If pattern is preceded by ‘#’ (the third form above), 
           # it must match at the beginning of the expanded value of parameter
+          # SUBSTITUTE_URL is set at the pipeline definition and pattern match happens to get the folder name
           fork_repo_url=$(FORK_REPO_URL)
-          repourl="${fork_repo_url#https://github.com/schandra13/}"
+          repourl="${fork_repo_url#$(SUBSTITUTE_URL)}"
           echo "reponame is : $repourl"
           echo "##vso[task.setvariable variable=FORK_FOLDER]$repourl"
         displayName: "Fetch fork repo folder name"
@@ -65,8 +66,12 @@ stages:
           cd $(FORK_FOLDER)
           git remote add upstream $(UPSTREAM_REPO_URL)          
           git fetch upstream
+        displayName: "Fetch upstream"
+
+      - bash: |
+          cd $(FORK_FOLDER)
           git merge --no-ff upstream/$(UPSTREAM_BRANCH)
-        displayName: "Fetch upstream and merge fast forward only"
+        displayName: "Merge fast forward only"
 
       - bash: |
           cd $(FORK_FOLDER)
