@@ -1584,13 +1584,13 @@ void Arguments::set_heap_size() {
   if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
     FLAG_SET_DEFAULT(MinRAMPercentage, 25.0);
     FLAG_SET_DEFAULT(InitialRAMPercentage, 50.0);
-    if (phys_mem >= 16 * 1024*1024*1024){  // 16g
+    if (phys_mem >= (julong)16 * 1024*1024*1024){  // 16g
       FLAG_SET_DEFAULT(MaxRAMPercentage, 90.0); 
-    } else if (phys_mem >= 6 *1024*1024*1024){ // 6g
+    } else if (phys_mem >= (julong)6 *1024*1024*1024){ // 6g
       FLAG_SET_DEFAULT(MaxRAMPercentage, 85.0);
-    } else if (phys_mem >= 4 * 1024*1024*1024){ // 4g
+    } else if (phys_mem >= (julong)4 * 1024*1024*1024){ // 4g
       FLAG_SET_DEFAULT(MaxRAMPercentage, 80.0);
-    } else if (phys_mem >= 0.5 * 1024*1024*1024){ // 0.5g
+    } else if (phys_mem >= (julong)0.5 * 1024*1024*1024){ // 0.5g
       FLAG_SET_DEFAULT(MaxRAMPercentage, 75.0);
     } else { 
       FLAG_SET_DEFAULT(MaxRAMPercentage, 50.0);
