@@ -131,6 +131,12 @@
   product(bool, UseShenandoahGC, false,                                     \
           "Use the Shenandoah garbage collector")                           \
                                                                             \
+  product(ccstr, ErgonomicsProfile, "shared",                               \
+          "Ergonomics profile to use. "                                     \
+          "Options include \"shared\" for when the JVM is running "         \
+          "in a shared environment and \"dedicated\" for when the "         \
+          "JVM is running on a system with dedicated resources")            \
+                                                                            \
   /* notice: the max range value here is INT_MAX not UINT_MAX  */           \
   /* to protect from overflows                                 */           \
   product(uint, ParallelGCThreads, 0,                                       \

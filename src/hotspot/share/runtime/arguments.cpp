@@ -70,6 +70,9 @@
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
+#ifdef LINUX
+#include "osContainer_linux.hpp"
+#endif
 
 #include <limits>
 
@@ -1514,6 +1517,22 @@ jint Arguments::set_ergonomics_flags() {
   return JNI_OK;
 }
 
+void Arguments::set_ergonomics_profile() {
+  if (FLAG_IS_DEFAULT(ErgonomicsProfile)){
+
+#ifdef LINUX
+    if (OSContainer::is_containerized()){
+      FLAG_SET_ERGO(ErgonomicsProfile, "dedicated");
+    }
+#endif //LINUX
+
+  } else {
+    if (strcmp(ErgonomicsProfile, "shared") != 0 && strcmp(ErgonomicsProfile, "dedicated") != 0) {
+      vm_exit_during_initialization(err_msg("Unsupported ErgonomicsProfile: %s", ErgonomicsProfile));
+    }
+  }
+}
+
 size_t Arguments::limit_heap_by_allocatable_memory(size_t limit) {
   size_t max_allocatable;
   size_t result = limit;
@@ -1561,6 +1580,22 @@ void Arguments::set_heap_size() {
                                        : (julong)MaxRAM;
   }
 
+   // Update default heap size for dedicated ergonomics profile
+  if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
+    FLAG_SET_DEFAULT(MinRAMPercentage, 25.0);
+    FLAG_SET_DEFAULT(InitialRAMPercentage, 50.0);
+    if (phys_mem >= 16G){ 
+      FLAG_SET_DEFAULT(MaxRAMPercentage, 90.0);
+    } else if (phys_mem >= 6G){ 
+      FLAG_SET_DEFAULT(MaxRAMPercentage, 85.0);
+    } else if (phys_mem >= 4G){ 
+      FLAG_SET_DEFAULT(MaxRAMPercentage, 80.0);
+    } else if (phys_mem >= 0.5G){ 
+      FLAG_SET_DEFAULT(MaxRAMPercentage, 75.0);
+    } else { 
+      FLAG_SET_DEFAULT(MaxRAMPercentage, 50.0);
+    }
+  }
 
   // Convert deprecated flags
   if (FLAG_IS_DEFAULT(MaxRAMPercentage) &&
@@ -3980,6 +4015,8 @@ jint Arguments::apply_ergo() {
   // Set flags based on ergonomics.
   jint result = set_ergonomics_flags();
   if (result != JNI_OK) return result;
+
+  set_ergonomics_profile();
 
   // Set heap size based on available physical memory
   set_heap_size();

@@ -260,6 +260,7 @@ class Arguments : AllStatic {
   static bool _ClipInlining;
 
   // GC ergonomics
+  static void set_ergonomics_profile();
   static void set_conservative_max_heap_alignment();
   static void set_use_compressed_oops();
   static void set_use_compressed_klass_ptrs();
