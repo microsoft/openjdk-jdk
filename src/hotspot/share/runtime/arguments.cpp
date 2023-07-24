@@ -1584,7 +1584,7 @@ void Arguments::set_heap_size() {
   if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
     FLAG_SET_DEFAULT(MinRAMPercentage, 25.0);
     FLAG_SET_DEFAULT(InitialRAMPercentage, 50.0);
-    if (phys_mem >= (julong)16 * 1024*1024*1024){  // 16g
+    if (phys_mem >= (julong)16*G){  // 16g
       FLAG_SET_DEFAULT(MaxRAMPercentage, 90.0); 
     } else if (phys_mem >= (julong)6 *1024*1024*1024){ // 6g
       FLAG_SET_DEFAULT(MaxRAMPercentage, 85.0);
