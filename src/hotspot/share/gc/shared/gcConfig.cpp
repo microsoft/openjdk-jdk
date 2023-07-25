@@ -111,7 +111,7 @@ void GCConfig::select_gc_ergonomically() {
 #endif
     }
   } else if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
-    phys_mem = os::physical_memory();
+    julong phys_mem = os::physical_memory();
     if (os::active_processor_count() <= 1) {
 #if INCLUDE_SERIALGC
       FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
