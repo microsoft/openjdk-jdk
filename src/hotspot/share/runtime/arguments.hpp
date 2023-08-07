@@ -261,6 +261,7 @@ class Arguments : AllStatic {
 
   // GC ergonomics
   static void set_ergonomics_profile();
+  static bool is_valid_ergonomics_profile(const char* profile);
   static void set_conservative_max_heap_alignment();
   static void set_use_compressed_oops();
   static void set_use_compressed_klass_ptrs();

@@ -1491,6 +1491,19 @@ void Arguments::set_use_compressed_klass_ptrs() {
 #endif // _LP64
 }
 
+bool Arguments::is_valid_ergonomics_profile(const char* profile) {
+  if (profile == NULL) {
+    return false;
+  }
+  if (strcmp(profile, "shared") == 0) {
+    return true;
+  }
+  if (strcmp(profile, "dedicated") == 0) {
+    return true;
+  }
+  return false;
+}
+
 void Arguments::set_conservative_max_heap_alignment() {
   // The conservative maximum required alignment for the heap is the maximum of
   // the alignments imposed by several sources: any requirements from the heap
@@ -1528,7 +1541,7 @@ void Arguments::set_ergonomics_profile() {
 #endif //LINUX
 
   } else {
-    if (strcmp(ErgonomicsProfile, "shared") != 0 && strcmp(ErgonomicsProfile, "dedicated") != 0) {
+    if (!is_valid_ergonomics_profile(ErgonomicsProfile)) {
       vm_exit_during_initialization(err_msg("Unsupported ErgonomicsProfile: %s", ErgonomicsProfile));
     }
   }
