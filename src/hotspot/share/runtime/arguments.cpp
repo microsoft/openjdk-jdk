@@ -1525,17 +1525,16 @@ jint Arguments::set_ergonomics_flags() {
 
 void Arguments::set_ergonomics_profile() {
   validate_ergonomics_profile();
-  PropertyList_add(&_system_properties, new SystemProperty("java.vm.ergonomics.profile", ErgonomicsProfile,  false));
 
   if (FLAG_IS_DEFAULT(ErgonomicsProfile)){
-
 #ifdef LINUX
     if (OSContainer::is_containerized()){
       FLAG_SET_ERGO(ErgonomicsProfile, "dedicated");
     }
 #endif //LINUX
-
   }
+
+  PropertyList_add(&_system_properties, new SystemProperty("java.vm.ergonomics.profile", ErgonomicsProfile,  false));
 }
 
 size_t Arguments::limit_heap_by_allocatable_memory(size_t limit) {
