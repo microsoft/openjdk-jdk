@@ -1581,7 +1581,7 @@ void Arguments::set_heap_size() {
                                        : (julong)MaxRAM;
   }
 
-   // Update default heap size for dedicated ergonomics profile
+  // Update default heap size for dedicated ergonomics profile
   if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
     FLAG_SET_DEFAULT(MinRAMPercentage, 25.0);
     FLAG_SET_DEFAULT(InitialRAMPercentage, 50.0);
