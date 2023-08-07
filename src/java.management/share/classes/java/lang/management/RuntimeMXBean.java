@@ -359,4 +359,17 @@ public interface RuntimeMXBean extends PlatformManagedObject {
      *     to the system properties.
      */
     public java.util.Map<String, String> getSystemProperties();
+
+    /**
+     * Returns the selected ergonomics profile for this Java virtual machine.
+     * The profile will be one of the following:
+     * <ul>
+     *   <li>shared</li>
+     *   <li>dedicated</li>
+     * </ul>
+     * 
+     * @return the name of the selected ergonomics profile
+     */
+    public String getJvmErgonomicsProfile();
+
 }

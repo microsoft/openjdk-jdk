@@ -33,6 +33,9 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+
+import org.w3c.dom.css.Counter;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.security.AccessController;
@@ -200,6 +203,10 @@ class VMManagementImpl implements VMManagement {
     public native long getStartupTime();
     private native long getUptime0();
     public native int getAvailableProcessors();
+
+    public String getErgonomicsProfile() {
+        return System.getProperty("java.vm.ergonomics.profile");
+    }
 
     // Compilation Subsystem
     public String   getCompilerName() {

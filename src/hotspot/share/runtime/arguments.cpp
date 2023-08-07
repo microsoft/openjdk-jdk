@@ -370,6 +370,7 @@ void Arguments::init_system_properties() {
   PropertyList_add(&_system_properties, new SystemProperty("java.vm.version", VM_Version::vm_release(),  false));
   PropertyList_add(&_system_properties, new SystemProperty("java.vm.name", VM_Version::vm_name(),  false));
   PropertyList_add(&_system_properties, new SystemProperty("jdk.debug", VM_Version::jdk_debug_level(),  false));
+  PropertyList_add(&_system_properties, new SystemProperty("java.vm.ergonomics.profile", ErgonomicsProfile,  false));
 
   // Initialize the vm.info now, but it will need updating after argument parsing.
   _vm_info = new SystemProperty("java.vm.info", VM_Version::vm_info_string(), true);
