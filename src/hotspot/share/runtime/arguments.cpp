@@ -370,7 +370,6 @@ void Arguments::init_system_properties() {
   PropertyList_add(&_system_properties, new SystemProperty("java.vm.version", VM_Version::vm_release(),  false));
   PropertyList_add(&_system_properties, new SystemProperty("java.vm.name", VM_Version::vm_name(),  false));
   PropertyList_add(&_system_properties, new SystemProperty("jdk.debug", VM_Version::jdk_debug_level(),  false));
-  PropertyList_add(&_system_properties, new SystemProperty("java.vm.ergonomics.profile", ErgonomicsProfile,  false));
 
   // Initialize the vm.info now, but it will need updating after argument parsing.
   _vm_info = new SystemProperty("java.vm.info", VM_Version::vm_info_string(), true);
@@ -1491,17 +1490,10 @@ void Arguments::set_use_compressed_klass_ptrs() {
 #endif // _LP64
 }
 
-bool Arguments::is_valid_ergonomics_profile(const char* profile) {
-  if (profile == NULL) {
-    return false;
+static void validate_ergonomics_profile() {
+  if (strcmp(ErgonomicsProfile, "shared") != 0 && strcmp(ErgonomicsProfile, "dedicated") != 0) {
+    vm_exit_during_initialization(err_msg("Unsupported ErgonomicsProfile: %s", ErgonomicsProfile));
   }
-  if (strcmp(profile, "shared") == 0) {
-    return true;
-  }
-  if (strcmp(profile, "dedicated") == 0) {
-    return true;
-  }
-  return false;
 }
 
 void Arguments::set_conservative_max_heap_alignment() {
@@ -1532,6 +1524,9 @@ jint Arguments::set_ergonomics_flags() {
 }
 
 void Arguments::set_ergonomics_profile() {
+  validate_ergonomics_profile();
+  PropertyList_add(&_system_properties, new SystemProperty("java.vm.ergonomics.profile", ErgonomicsProfile,  false));
+
   if (FLAG_IS_DEFAULT(ErgonomicsProfile)){
 
 #ifdef LINUX
@@ -1540,10 +1535,6 @@ void Arguments::set_ergonomics_profile() {
     }
 #endif //LINUX
 
-  } else {
-    if (!is_valid_ergonomics_profile(ErgonomicsProfile)) {
-      vm_exit_during_initialization(err_msg("Unsupported ErgonomicsProfile: %s", ErgonomicsProfile));
-    }
   }
 }
 
