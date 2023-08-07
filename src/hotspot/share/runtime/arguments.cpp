@@ -4016,11 +4016,12 @@ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
 }
 
 jint Arguments::apply_ergo() {
+  // Set the ergonomics profile
+  set_ergonomics_profile();
+
   // Set flags based on ergonomics.
   jint result = set_ergonomics_flags();
   if (result != JNI_OK) return result;
-
-  set_ergonomics_profile();
 
   // Set heap size based on available physical memory
   set_heap_size();
