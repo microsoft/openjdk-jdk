@@ -133,9 +133,9 @@
                                                                             \
   product(ccstr, ErgonomicsProfile, "shared",                               \
           "Ergonomics profile to use. "                                     \
-          "Options include \"shared\" for when the JVM is running "         \
-          "in a shared environment and \"dedicated\" for when the "         \
-          "JVM is running on a system with dedicated resources")            \
+          "\"shared\" (default) for when the JVM is running "         \
+          "in a traditional environment and \"dedicated\" for when the "         \
+          "JVM is running on an environment such as containers")            \
                                                                             \
   /* notice: the max range value here is INT_MAX not UINT_MAX  */           \
   /* to protect from overflows                                 */           \
