@@ -1534,6 +1534,7 @@ void Arguments::set_ergonomics_profile() {
 #endif //LINUX
   }
 
+  // Store so we can expose through JMX RuntimeMBean
   PropertyList_add(&_system_properties, new SystemProperty("java.vm.ergonomics.profile", ErgonomicsProfile,  false));
 }
 

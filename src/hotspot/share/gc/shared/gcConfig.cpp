@@ -95,32 +95,33 @@ void GCConfig::fail_if_non_included_gc_is_selected() {
   NOT_ZGC(         FAIL_IF_SELECTED(UseZGC));
 }
 
-void GCConfig::select_gc_ergonomically() {
-  if (strcmp(ErgonomicsProfile, "shared") == 0) {
-    if (os::is_server_class_machine()) {
+void select_gc_ergonomically_shared() {
+  if (os::is_server_class_machine()) {
 #if INCLUDE_G1GC
-      FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
+    FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
 #elif INCLUDE_PARALLELGC
-      FLAG_SET_ERGO_IF_DEFAULT(UseParallelGC, true);
+    FLAG_SET_ERGO_IF_DEFAULT(UseParallelGC, true);
 #elif INCLUDE_SERIALGC
-      FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
+    FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
 #endif
-    } else {
+  } else {
+#if INCLUDE_SERIALGC
+    FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
+#endif
+  }
+}
+
+void select_gc_ergonomically_dedicated() {
+  julong phys_mem = os::physical_memory();
+  if (os::active_processor_count() <= 1) {
 #if INCLUDE_SERIALGC
       FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
 #endif
-    }
-  } else if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
-    julong phys_mem = os::physical_memory();
-    if (os::active_processor_count() <= 1) {
-#if INCLUDE_SERIALGC
-      FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
-#endif
-    } else if (phys_mem >= 16*G){
+    } else if (phys_mem >= 16*G) {
 #if INCLUDE_ZGC
       FLAG_SET_ERGO_IF_DEFAULT(UseZGC, true);
 #endif
-    } else if (phys_mem > 2048*M){
+    } else if (phys_mem > 2048*M) {
 #if INCLUDE_G1GC
       FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
 #endif
@@ -129,7 +130,15 @@ void GCConfig::select_gc_ergonomically() {
       FLAG_SET_ERGO_IF_DEFAULT(UseParallelGC, true);
 #endif
     }
+}
+
+void GCConfig::select_gc_ergonomically() {
+  if (strcmp(ErgonomicsProfile, "shared") == 0) {
+    select_gc_ergonomically_shared();
+  } else if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
+    select_gc_ergonomically_dedicated();
   } else {
+    // We have got to have at least one GC selected. Otherwise, we will crash.
     ShouldNotReachHere();
   }
 }
