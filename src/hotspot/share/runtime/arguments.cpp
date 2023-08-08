@@ -1587,7 +1587,6 @@ void Arguments::set_heap_size() {
 
   // Update default heap size for dedicated ergonomics profile
   if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
-    FLAG_SET_DEFAULT(MinRAMPercentage, 25.0);
     FLAG_SET_DEFAULT(InitialRAMPercentage, 50.0);
     if (phys_mem >= 16*G){
       FLAG_SET_DEFAULT(MaxRAMPercentage, 90.0); 
