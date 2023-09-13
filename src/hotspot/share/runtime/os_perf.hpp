@@ -197,6 +197,34 @@ class NetworkInterface : public ResourceObj {
   }
 };
 
+//keerthi - Need to make sure I send all the file descriptors. 
+class FileInformation : public CHeapObj<mtInternal> {
+ private:
+  int _FD;
+  const char* _path; 
+
+ public:
+  FileInformation() :
+    _FD(10),
+    _path(nullptr) {}
+
+  int _file_descriptor(void) const {
+    return _FD;
+  }
+
+  void set_file_descriptor(int _file_descriptor) {
+    _FD = _file_descriptor;
+  }
+
+  const char* _file_path(void)  const {
+    return _path;
+  }
+
+  void set_file_path(const char* _file_path) {
+    _path = _file_path;
+  }
+};
+
 class CPUInformationInterface : public CHeapObj<mtInternal> {
  private:
   CPUInformation* _cpu_info;
@@ -248,6 +276,17 @@ class NetworkPerformanceInterface : public CHeapObj<mtInternal> {
   bool initialize();
   ~NetworkPerformanceInterface();
   int network_utilization(NetworkInterface** network_interfaces) const;
+};
+
+//Keerthi
+class FileInformationInterface : public CHeapObj<mtInternal> {
+ private:
+  FileInformation* _file_info;
+ public:
+  FileInformationInterface();
+  bool initialize();
+  ~FileInformationInterface();
+  int file_information(FileInformation* file_info);
 };
 
 #endif // SHARE_RUNTIME_OS_PERF_HPP

@@ -47,6 +47,7 @@
 #include <limits.h>
 #include <ifaddrs.h>
 #include <fcntl.h>
+#include <iostream>
 
 /**
    /proc/[number]/stat
@@ -306,6 +307,7 @@ static int read_ticks(const char* procfile, uint64_t* userTicks, uint64_t* syste
   return read_statdata(procfile, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u " UINT64_FORMAT " " UINT64_FORMAT,
     userTicks, systemTicks);
 }
+
 
 /**
  * Return the number of ticks spent in any of the processes belonging
@@ -960,6 +962,87 @@ int CPUInformationInterface::cpu_information(CPUInformation& cpu_info) {
   cpu_info = *_cpu_info; // shallow copy assignment
   return OS_OK;
 }
+
+FileInformationInterface::FileInformationInterface() {
+  std::cout << "Hello this is in linux";
+  _file_info = nullptr;
+}
+
+bool FileInformationInterface::initialize() { 
+  return true;
+}
+
+FileInformationInterface::~FileInformationInterface() {
+  std::cout << "Hello this is in linux";
+  if (_file_info != nullptr) {
+    if (_file_info->_file_path() != nullptr) {
+      const char* _file_path = _file_info->_file_path();
+      FREE_C_HEAP_ARRAY(char, _file_path);
+      _file_info->set_file_path(nullptr);
+    }   
+    delete _file_info;
+  }
+}
+
+int FileInformationInterface::file_information(FileInformation* file_info) {
+  // std::cout << "Hello this is in linux";
+  // if (_file_info == nullptr) {
+  //   return OS_ERR;
+  // }
+
+   DIR *taskDir;
+  struct dirent *entry;
+  char procDir[512] = "/proc/self/fd";
+   char fdPath[64]; 
+  //file_info = new FileInformation[1024];  
+  std::cout << "Hello this is in linux";
+  taskDir = opendir("/proc/self/fd");
+  int count = 0;
+  if (!taskDir) {
+        perror("opendir");
+        return false;
+    }
+    std::cout << "Open File Descriptors:" << std::endl;
+    while ((entry = readdir(taskDir))) {
+        if (entry->d_name[0] != '.') {
+            int fd = atoi(entry->d_name);
+            char path[4096];  
+            char combinedPath[512];  // Adjust the size as needed
+            strcpy(combinedPath, procDir);  // Copy the content of procDir
+            strcat(combinedPath, entry->d_name);
+            snprintf(fdPath, sizeof(fdPath), "/proc/self/fd/%d", fd);
+            // Buffer for the path            
+            ssize_t len = readlink(fdPath, path, sizeof(path) - 1);
+
+            if (len != -1) {
+                path[len] = '\0';
+                std::cout << "FD: " << fd << ", FQN: " << path << std::endl;
+                 file_info[count].set_file_descriptor(fd);
+                file_info[count].set_file_path(path);
+            }
+          
+            ++count;
+        }
+
+    }
+  
+  std::cout << "count:" << count << std::endl;
+
+    closedir(taskDir);
+    
+  //listOpenFileDescriptors();  
+
+ // file_info = _file_info; // shallow copy assignment
+  std::cout << "File Descriptor at after shallow copy 0: " << file_info[0]._file_descriptor()
+                      << ", File Path: " << file_info[0]._file_path() << std::endl;
+  std::cout << "File Descriptor at after shallow copy 1: " << file_info[1]._file_descriptor()
+<< ", File Path: " << file_info[1]._file_path() << std::endl;
+std::cout << "File Descriptor at after shallow copy 2: " << file_info[2]._file_descriptor()
+<< ", File Path: " << file_info[2]._file_path() << std::endl;
+  return OS_OK;
+}
+
+
 
 class NetworkPerformanceInterface::NetworkPerformance : public CHeapObj<mtInternal> {
   friend class NetworkPerformanceInterface;

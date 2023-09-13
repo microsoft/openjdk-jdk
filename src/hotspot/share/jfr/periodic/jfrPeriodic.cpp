@@ -69,6 +69,7 @@
 #include "services/threadService.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/globalDefinitions.hpp"
+#include "iostream"
 #if INCLUDE_G1GC
 #include "gc/g1/g1HeapRegionEventSender.hpp"
 #endif
@@ -224,6 +225,24 @@ TRACE_REQUEST_FUNC(ThreadCPULoad) {
 TRACE_REQUEST_FUNC(NetworkUtilization) {
   JfrNetworkUtilization::send_events();
 }
+
+TRACE_REQUEST_FUNC(FileInformation) {
+  FileInformation _file_info[1024];  
+   int ret_val = JfrOSInterface::file_information(_file_info);   
+ 
+  EventFileInformation event;    
+    const JfrTicks cur_time = JfrTicks::now();
+    event.set_starttime(cur_time);   
+    int index = 0;
+    while (_file_info[index]._file_descriptor() != 10 && _file_info[index]._file_path() != nullptr) {          
+          event.set_FD(_file_info[index]._file_descriptor());
+          event.set_Path(_file_info[index]._file_path());
+          event.commit();
+        ++index;
+    }   
+    const JfrTicks end_time = JfrTicks::now();
+    event.set_endtime(end_time);  
+    }
 
 TRACE_REQUEST_FUNC(CPUTimeStampCounter) {
   EventCPUTimeStampCounter event;

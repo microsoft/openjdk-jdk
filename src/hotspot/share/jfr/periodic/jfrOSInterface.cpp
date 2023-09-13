@@ -62,11 +62,14 @@ class JfrOSInterface::JfrOSInterfaceImpl : public JfrCHeapObj {
   CPUPerformanceInterface* _cpu_perf_interface;
   SystemProcessInterface* _system_process_interface;
   NetworkPerformanceInterface* _network_performance_interface;
+  FileInformationInterface* _file_info_interface;
+  
 
   CPUInformationInterface* cpu_info_interface();
   CPUPerformanceInterface* cpu_perf_interface();
   SystemProcessInterface* system_process_interface();
   NetworkPerformanceInterface* network_performance_interface();
+  FileInformationInterface* file_info_interface();
 
   JfrOSInterfaceImpl();
   bool initialize();
@@ -89,12 +92,15 @@ class JfrOSInterface::JfrOSInterfaceImpl : public JfrCHeapObj {
   int system_processes(SystemProcess** system_processes, int* no_of_sys_processes);
 
   int network_utilization(NetworkInterface** network_interfaces);
+
+  int file_information(FileInformation* file_info);
 };
 
 JfrOSInterface::JfrOSInterfaceImpl::JfrOSInterfaceImpl() : _cpu_info_interface(nullptr),
                                                            _cpu_perf_interface(nullptr),
-                                                           _system_process_interface(nullptr),
-                                                           _network_performance_interface(nullptr) {}
+                                                           _system_process_interface(nullptr),                                                           
+                                                           _network_performance_interface(nullptr),
+                                                           _file_info_interface(nullptr) {}
 
 template <typename T>
 static T* create_interface() {
@@ -137,6 +143,13 @@ NetworkPerformanceInterface* JfrOSInterface::JfrOSInterfaceImpl::network_perform
   return _network_performance_interface;
 }
 
+FileInformationInterface* JfrOSInterface::JfrOSInterfaceImpl::file_info_interface() {
+  if (_file_info_interface == nullptr) {
+    _file_info_interface = create_interface<FileInformationInterface>();
+  }
+  return _file_info_interface;
+}
+
 bool JfrOSInterface::JfrOSInterfaceImpl::initialize() {
   return true;
 }
@@ -158,6 +171,11 @@ JfrOSInterface::JfrOSInterfaceImpl::~JfrOSInterfaceImpl(void) {
     delete _network_performance_interface;
     _network_performance_interface = nullptr;
   }
+  if (_file_info_interface != nullptr) {
+    delete _file_info_interface;
+    _file_info_interface = nullptr;
+  }
+  
 }
 
 int JfrOSInterface::JfrOSInterfaceImpl::cpu_information(CPUInformation& cpu_info) {
@@ -197,6 +215,12 @@ int JfrOSInterface::JfrOSInterfaceImpl::system_processes(SystemProcess** system_
 int JfrOSInterface::JfrOSInterfaceImpl::network_utilization(NetworkInterface** network_interfaces) {
   NetworkPerformanceInterface* const iface = network_performance_interface();
   return iface == nullptr ? OS_ERR : iface->network_utilization(network_interfaces);
+}
+
+//keerthi
+int JfrOSInterface::JfrOSInterfaceImpl::file_information(FileInformation* file_info) {
+  FileInformationInterface* const iface = file_info_interface();
+  return iface == nullptr ? OS_ERR : iface->file_information(file_info);
 }
 
 // assigned char* is RESOURCE_HEAP_ALLOCATED
@@ -311,4 +335,8 @@ int JfrOSInterface::system_processes(SystemProcess** sys_processes, int* no_of_s
 
 int JfrOSInterface::network_utilization(NetworkInterface** network_interfaces) {
   return instance()._impl->network_utilization(network_interfaces);
+}
+
+int JfrOSInterface::file_information(FileInformation* file_info) {
+  return instance()._impl->file_information(file_info);
 }

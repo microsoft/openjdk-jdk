@@ -854,6 +854,11 @@
     <Field type="long" contentType="bits-per-second" name="writeRate" label="Write Rate" description="Number of outgoing bits per second"/>
   </Event>
 
+  <Event name="FileInformation" category="Operating System, Java Application" label="File open" period="everyChunk">    
+    <Field type="int"  name="FD" label="File Descriptor" description="File Descriptor"/>
+    <Field type="string" name="Path" label="Path" description="The FQN of the File"/>
+  </Event>
+
   <Event name="JavaThreadStatistics" category="Java Application, Statistics" label="Java Thread Statistics" period="everyChunk">
     <Field type="long" name="activeCount" label="Active Threads" description="Number of live active threads including both daemon and non-daemon threads" />
     <Field type="long" name="daemonCount" label="Daemon Threads" description="Number of live daemon threads" />
