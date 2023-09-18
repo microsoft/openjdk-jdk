@@ -36,6 +36,7 @@ import java.nio.channels.FileChannel;
 import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.test.lib.Utils;
+import jdk.test.lib.jfr.EventNames;
 import jdk.test.lib.jfr.Events;
 
 /**
@@ -57,7 +58,9 @@ public class TestDisabledEvents {
         File tmp = Utils.createTempFile("TestDisabledEvents", ".tmp").toFile();
         try (Recording recording = new Recording()) {
             recording.disable(IOEvent.EVENT_FILE_READ);
-            recording.disable(IOEvent.EVENT_FILE_WRITE);
+            recording.disable(IOEvent.EVENT_FILE_WRITE);   
+            recording.disable(EventNames.FileReadIOStatistics);
+            recording.disable(EventNames.FileWriteIOStatistics);         
             recording.start();
 
             useRandomAccessFile(tmp);
@@ -70,6 +73,8 @@ public class TestDisabledEvents {
                 System.out.println("Got eventName:" + eventName);
                 assertNotEquals(eventName, IOEvent.EVENT_FILE_READ, "Got disabled read event");
                 assertNotEquals(eventName, IOEvent.EVENT_FILE_WRITE, "Got disabled write event");
+                assertNotEquals(eventName, EventNames.FileReadIOStatistics, "Got disabled FileReadIOStatistics Event");
+                assertNotEquals(eventName, EventNames.FileWriteIOStatistics, "Got disabled FileWriteIOStatistics Event");
             }
         }
     }

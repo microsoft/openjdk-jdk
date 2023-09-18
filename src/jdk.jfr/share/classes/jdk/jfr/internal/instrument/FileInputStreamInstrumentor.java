@@ -29,6 +29,7 @@ import java.io.IOException;
 
 import jdk.jfr.events.EventConfigurations;
 import jdk.jfr.events.FileReadEvent;
+import jdk.jfr.internal.instrument.FileIOStatistics;
 import jdk.jfr.internal.event.EventConfiguration;
 
 /**
@@ -45,75 +46,111 @@ final class FileInputStreamInstrumentor {
     @JIInstrumentationMethod
     public int read() throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_READ;
-        if (!eventConfiguration.isEnabled()) {
-            return read();
-        }
+        EventConfiguration fileReadIOeventConfiguration = EventConfigurations.FILE_READ_IO_STATISTICS;
         int result = 0;
         boolean endOfFile = false;
         long bytesRead = 0;
         long start = 0;
-        try {
+        long duration = 0;
+
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
             result = read();
-            if (result < 0) {
-                endOfFile = true;
-            } else {
-                bytesRead = 1;
-            }
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                FileReadEvent.commit(start, duration, path, bytesRead, endOfFile);
+            duration = EventConfiguration.timestamp() - start;
+        }
+        else {
+            try {
+                start = EventConfiguration.timestamp();
+                result = read();
+                if (result < 0) {
+                    endOfFile = true;
+                } else {
+                    bytesRead = 1;
+                }
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    FileReadEvent.commit(start, duration, path, bytesRead, endOfFile);
+                }
             }
         }
+       
+        if(fileReadIOeventConfiguration.isEnabled()){            
+            FileIOStatistics.setTotalReadBytesForPeriod(((result < 0) ? 0 : 1), duration);
+        }
+
         return result;
     }
 
     @JIInstrumentationMethod
     public int read(byte b[]) throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_READ;
-        if (!eventConfiguration.isEnabled()) {
-            return read(b);
-        }
+        EventConfiguration fileReadIOEventConfiguration = EventConfigurations.FILE_READ_IO_STATISTICS;
         int bytesRead = 0;
         long start = 0;
-        try {
+        long duration = 0;
+
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
             bytesRead = read(b);
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                if (bytesRead < 0) {
-                    FileReadEvent.commit(start, duration, path, 0L, true);
-                } else {
-                    FileReadEvent.commit(start, duration, path, bytesRead, false);
+            duration = EventConfiguration.timestamp() - start;
+        }  
+        else {     
+            try {
+                start = EventConfiguration.timestamp();
+                bytesRead = read(b);
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    if (bytesRead < 0) {
+                        FileReadEvent.commit(start, duration, path, 0L, true);
+                    } else {
+                        FileReadEvent.commit(start, duration, path, bytesRead, false);
+                    }
                 }
             }
         }
+
+        if(fileReadIOEventConfiguration.isEnabled()){            
+            FileIOStatistics.setTotalReadBytesForPeriod(((bytesRead < 0) ? 0 : bytesRead), duration);
+        }
+
         return bytesRead;
     }
 
     @JIInstrumentationMethod
     public int read(byte b[], int off, int len) throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_READ;
-        if (!eventConfiguration.isEnabled()) {
-            return read(b, off, len);
-        }
+        EventConfiguration fileReadIOEventConfiguration = EventConfigurations.FILE_READ_IO_STATISTICS;
         int bytesRead = 0;
         long start = 0;
-        try {
+        long duration = 0;
+        
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
             bytesRead = read(b, off, len);
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                if (bytesRead < 0) {
-                    FileReadEvent.commit(start, duration, path, 0L, true);
-                } else {
-                    FileReadEvent.commit(start, duration, path, bytesRead, false);
+            duration = EventConfiguration.timestamp() - start;
+        }  
+        else {     
+            try {
+                start = EventConfiguration.timestamp();
+                bytesRead = read(b, off, len);
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    if (bytesRead < 0) {
+                        FileReadEvent.commit(start, duration, path, 0L, true);
+                    } else {
+                        FileReadEvent.commit(start, duration, path, bytesRead, false);
+                    }
                 }
             }
         }
+        
+        if(fileReadIOEventConfiguration.isEnabled()){            
+            FileIOStatistics.setTotalReadBytesForPeriod(((bytesRead < 0) ? 0 : bytesRead), duration);
+        }
+        
         return bytesRead;
     }
 }

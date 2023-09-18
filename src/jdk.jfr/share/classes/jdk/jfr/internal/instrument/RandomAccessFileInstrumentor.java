@@ -46,138 +46,207 @@ final class RandomAccessFileInstrumentor {
     @JIInstrumentationMethod
     public int read() throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_READ;
-        if (!eventConfiguration.isEnabled()) {
-            return read();
-        }
+        EventConfiguration fileReadIOEventConfiguration = EventConfigurations.FILE_READ_IO_STATISTICS;
         int result = 0;
         long bytesRead = 0;
         boolean endOfFile = false;
         long start = 0;
-        try {
+        long duration = 0;
+
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
             result = read();
-            if (result < 0) {
-                endOfFile = true;
-            } else {
-                bytesRead = 1;
-            }
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                FileReadEvent.commit(start, duration, path, bytesRead, endOfFile);
+            duration = EventConfiguration.timestamp() - start;
+        }
+        else {
+            try {
+                start = EventConfiguration.timestamp();
+                result = read();
+                if (result < 0) {
+                    endOfFile = true;
+                } else {
+                    bytesRead = 1;
+                }
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    FileReadEvent.commit(start, duration, path, bytesRead, endOfFile);
+                }
             }
         }
+
+        if(fileReadIOEventConfiguration.isEnabled()){            
+            FileIOStatistics.setTotalReadBytesForPeriod(((result < 0) ? 0 : 1), duration);
+        }       
+       
         return result;
     }
 
     @JIInstrumentationMethod
     public int read(byte b[]) throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_READ;
-        if (!eventConfiguration.isEnabled()) {
-            return read(b);
-        }
+        EventConfiguration fileReadIOEventConfiguration = EventConfigurations.FILE_READ_IO_STATISTICS;
         int bytesRead = 0;
+        boolean endOfFile = false;
         long start = 0;
-        try {
+        long duration = 0;
+
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
             bytesRead = read(b);
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                if (bytesRead < 0) {
-                    FileReadEvent.commit(start, duration, path, 0L, true);
-                } else {
-                    FileReadEvent.commit(start, duration, path, bytesRead, false);
+            duration = EventConfiguration.timestamp() - start;
+        }
+        else{
+            try {
+                start = EventConfiguration.timestamp();
+                bytesRead = read(b);
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    if (bytesRead < 0) {
+                        FileReadEvent.commit(start, duration, path, 0L, true);
+                    } else {
+                        FileReadEvent.commit(start, duration, path, bytesRead, false);
+                    }
                 }
             }
         }
+
+        if(fileReadIOEventConfiguration.isEnabled()){            
+            FileIOStatistics.setTotalReadBytesForPeriod(((bytesRead < 0) ? 0 : bytesRead), duration);
+        }
+       
         return bytesRead;
     }
 
     @JIInstrumentationMethod
     public int read(byte b[], int off, int len) throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_READ;
-        if (!eventConfiguration.isEnabled()) {
-            return read(b, off, len);
-        }
+        EventConfiguration fileReadIOEventConfiguration = EventConfigurations.FILE_READ_IO_STATISTICS;
         int bytesRead = 0;
+        boolean endOfFile = false;
         long start = 0;
-        try {
+        long duration = 0;
+
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
             bytesRead = read(b, off, len);
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                if (bytesRead < 0) {
-                    FileReadEvent.commit(start, duration, path, 0L, true);
-                } else {
-                    FileReadEvent.commit(start, duration, path, bytesRead, false);
+            duration = EventConfiguration.timestamp() - start;
+        }
+        else {
+            try {
+                start = EventConfiguration.timestamp();
+                bytesRead = read(b, off, len);
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    if (bytesRead < 0) {
+                        FileReadEvent.commit(start, duration, path, 0L, true);
+                    } else {
+                        FileReadEvent.commit(start, duration, path, bytesRead, false);
+                    }
                 }
             }
         }
+
+        if(fileReadIOEventConfiguration.isEnabled()){            
+            FileIOStatistics.setTotalReadBytesForPeriod(((bytesRead < 0) ? 0 : bytesRead), duration);
+        }
+       
         return bytesRead;
     }
 
     @JIInstrumentationMethod
     public void write(int b) throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_WRITE;
-        if (!eventConfiguration.isEnabled()) {
-            write(b);
-            return;
-        }
+        EventConfiguration fileWriteIOeventConfiguration = EventConfigurations.FILE_WRITE_IO_STATISTICS;
         long bytesWritten = 0;
         long start = 0;
-        try {
+        long duration = 0;
+        
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
-            write(b);
-            bytesWritten = 1;
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                FileWriteEvent.commit(start, duration, path, bytesWritten);
+            write(b);   
+            duration = EventConfiguration.timestamp() - start;         
+        }
+        else{
+            try {
+                start = EventConfiguration.timestamp();
+                write(b);
+                bytesWritten = 1;
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    FileWriteEvent.commit(start, duration, path, bytesWritten);
+                }
             }
+        }
+       if(fileWriteIOeventConfiguration.isEnabled()){                 
+            FileIOStatistics.setTotalWriteBytesForPeriod(1, duration);
         }
     }
 
     @JIInstrumentationMethod
     public void write(byte b[]) throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_WRITE;
-        if (!eventConfiguration.isEnabled()) {
-            write(b);
-            return;
-        }
+        EventConfiguration fileWriteIOeventConfiguration = EventConfigurations.FILE_WRITE_IO_STATISTICS;
         long bytesWritten = 0;
         long start = 0;
-        try {
+        long duration = 0;
+
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
             write(b);
-            bytesWritten = b.length;
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                FileWriteEvent.commit(start, duration, path, bytesWritten);
+            duration = EventConfiguration.timestamp() - start;
+        }
+        else{
+            try {
+                start = EventConfiguration.timestamp();
+                write(b);
+                bytesWritten = b.length;
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    FileWriteEvent.commit(start, duration, path, bytesWritten);
+                }
             }
         }
+
+        if(fileWriteIOeventConfiguration.isEnabled()){                 
+            FileIOStatistics.setTotalWriteBytesForPeriod(b.length, duration);
+        }
+       
     }
 
     @JIInstrumentationMethod
     public void write(byte b[], int off, int len) throws IOException {
         EventConfiguration eventConfiguration = EventConfigurations.FILE_WRITE;
-        if (!eventConfiguration.isEnabled()) {
-            write(b, off, len);
-            return;
-        }
+        EventConfiguration fileWriteIOeventConfiguration = EventConfigurations.FILE_WRITE_IO_STATISTICS;
         long bytesWritten = 0;
         long start = 0;
-        try {
+        long duration = 0;
+
+        if (!eventConfiguration.isEnabled()) {
             start = EventConfiguration.timestamp();
             write(b, off, len);
-            bytesWritten = len;
-        } finally {
-            long duration = EventConfiguration.timestamp() - start;
-            if (eventConfiguration.shouldCommit(duration)) {
-                FileWriteEvent.commit(start, duration, path, bytesWritten);
+            duration = EventConfiguration.timestamp() - start;
+        }
+        else {
+            try {
+                start = EventConfiguration.timestamp();
+                write(b, off, len);
+                bytesWritten = len;
+            } finally {
+                duration = EventConfiguration.timestamp() - start;
+                if (eventConfiguration.shouldCommit(duration)) {
+                    FileWriteEvent.commit(start, duration, path, bytesWritten);
+                }
             }
         }
+
+        if(fileWriteIOeventConfiguration.isEnabled()){                 
+            FileIOStatistics.setTotalWriteBytesForPeriod(len, duration);
+        }
+       
     }
 }
