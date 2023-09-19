@@ -1518,34 +1518,116 @@ static bool stable_phi(PhiNode* phi, PhaseGVN *phase) {
   return true;
 }
 
+
+static bool can_split_through_phi_helper(Node *base, Node *mem) {
+  bool base_is_phi = (base != nullptr) && base->is_Phi();
+  if (!base_is_phi) {
+   return false;
+  }
+  if (!mem->is_Phi()) {
+   if (!MemNode::all_controls_dominate(mem, base->in(0)))
+    return false;
+  } else if (base->in(0) != mem->in(0)) {
+    if (!MemNode::all_controls_dominate(mem, base->in(0))) {
+     return false;
+    }
+  }
+  return true;
+}
+
 //------------------------------split_through_phi------------------------------
 // Check whether a call to 'split_through_phi' would split this load through the
 // Phi *base*. This method is essentially a copy of the validations performed
 // by 'split_through_phi'. The first use of this method was in EA code as part
 // of simplification of allocation merges.
-bool LoadNode::can_split_through_phi_base(PhaseGVN* phase) {
+bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
   Node* mem        = in(Memory);
   Node* address    = in(Address);
   intptr_t ignore  = 0;
   Node*    base    = AddPNode::Ideal_base_and_offset(address, phase, ignore);
-  bool base_is_phi = (base != nullptr) && base->is_Phi();
 
-  if (req() > 3 || !base_is_phi) {
+  if (req() > 3) {
     return false;
   }
-
-  if (!mem->is_Phi()) {
-    if (!MemNode::all_controls_dominate(mem, base->in(0)))
-      return false;
-  } else if (base->in(0) != mem->in(0)) {
-    if (!MemNode::all_controls_dominate(mem, base->in(0))) {
-      return false;
+  if (!can_split_through_phi_helper(base, mem)) {
+    return false;
+  }
+  if (nested) {
+    Node *parent_phi = nullptr;
+    // find parent phi node for nestedphi
+    for(uint i = 1; i < base->req(); i++) {
+       if (base->in(i)->is_Phi()) {
+         parent_phi = base->in(i);
+         break;
+       }
+    }
+    if (!parent_phi) {
+     return false;
+    }
+    Node *memForLoadAfterOpt = MemNodeForNestedPhiLoadAfterOpt(phase, base, parent_phi);
+    if (!memForLoadAfterOpt || !can_split_through_phi_helper(parent_phi, memForLoadAfterOpt)) {
+     return false;
     }
   }
-
   return true;
 }
 
+// Pretend that optimization has happend on load fields and return the optimizaed load node 
+// return nullptr if optimization is impossible
+Node *LoadNode::MemNodeForNestedPhiLoadAfterOpt(PhaseGVN* phase, const Node *basephi, const Node* base_parentphi) {
+  
+  Node* mem        = in(Memory);
+  Node *address    = in(Address);
+  assert(basephi != nullptr && basephi->is_Phi(), "sanity");
+  assert(base_parentphi != nullptr && base_parentphi->is_Phi(), "sanity");
+
+  if (!basephi || !basephi->is_Phi() ||
+      !base_parentphi || !base_parentphi->is_Phi()) {
+   return nullptr;
+  }
+
+  // Select Region to split through.
+  Node* region;
+  if (!mem->is_Phi()) {
+    region = basephi->in(0);
+    // Skip if the region dominates some control edge of the memory.
+    if (!MemNode::all_controls_dominate(mem, region))
+      return nullptr;
+  } else if (basephi->in(0) != mem->in(0)) {
+    assert(mem->is_Phi(), "sanity");
+    if (MemNode::all_controls_dominate(mem, basephi->in(0))) {
+      region = basephi->in(0);
+    } else if (MemNode::all_controls_dominate(address, mem->in(0))) {
+      region = mem->in(0);
+    } else {
+      return nullptr; // complex graph
+    }
+  } else {
+    assert(basephi->in(0) == mem->in(0), "sanity");
+    region = mem->in(0);
+  }
+
+  Compile* C = phase->C;
+  for (uint i = 1; i < region->req(); i++) {
+    Node* in = region->in(i);
+    // return node only for parent phi of nested phi node
+    if (basephi->in(i) != base_parentphi) {
+      continue;
+    }
+    if (region->is_CountedLoop() && region->as_Loop()->is_strip_mined() && i == LoopNode::EntryControl &&
+        in != nullptr && in->is_OuterStripMinedLoop()) {
+      // No node should go in the outer strip mined loop
+      in = in->in(LoopNode::EntryControl);
+    }
+    if (in == nullptr || in == C->top()) {
+      // Dead path?  Use a dead data op
+      return C->top()->in(Memory);
+    } else if (mem->is_Phi() && (mem->in(0) == region)) {
+	return mem->in(i);
+    }
+   }
+  return mem;
+}
 //------------------------------split_through_phi------------------------------
 // Split instance or boxed field load through Phi.
 Node* LoadNode::split_through_phi(PhaseGVN* phase, bool ignore_missing_instance_id) {
