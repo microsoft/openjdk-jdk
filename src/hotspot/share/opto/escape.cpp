@@ -495,13 +495,14 @@ bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi, int nestedDepth)
       return false;
     } else if (use->is_Phi()) {
       if (ophi->_idx == use->_idx) {
-	tty->print_cr("***Can reduce self loop nested phi***");
+	     NOT_PRODUCT(if (TraceReduceAllocationMerges)tty->print_cr("Can NOT reduce Self loop nested Phi");)
+       return false;
       } else {
 	if (!can_reduce_phi_check_users(use->as_Phi(), nestedDepth+1)) {
  	 NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce nested Phi %d ", use->_idx);)
 	 return false;
 	} else {
-	     tty->print_cr("Can reduce nested Phi %d ", use->_idx);
+	    NOT_PRODUCT(if (TraceReduceAllocationMerges)  tty->print_cr("Can reduce nested Phi %d ", use->_idx);)
 	}
       }
     } else {
@@ -532,7 +533,7 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi, Unique_Node_List &candidates
     return false;
   }
 
-  if (!can_reduce_phi_check_inputs(ophi, candidates) || !can_reduce_phi_check_users(ophi, 1)) {
+  if (!can_reduce_phi_check_inputs(ophi, candidates) || !can_reduce_phi_check_users(ophi)) {
     return false;
   }
 
@@ -546,8 +547,6 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
   bool ignore_missing_instance_id = true;
   Unique_Node_List nested_phis;
 
-  if (ophi->outcnt() <= 0)
-   return;
   // Collect nested phi nodes
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
@@ -558,10 +557,7 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
   // make sure to process child phi nodes before parent phi nodes in nested phi scenario
   for (uint i=0; i<nested_phis.size(); i++) {
     Node *nested_phi = nested_phis.at(i);	  
-    if (alloc_worklist.contains(nested_phi)) {
-     tty->print_cr("Process child node before parent in nested phi");
-     reduce_phi_on_field_access(nested_phi->as_Phi(), alloc_worklist);
-    }
+    reduce_phi_on_field_access(nested_phi->as_Phi(), alloc_worklist);
   }
   // Iterate over Phi outputs looking for an AddP
   for (int j = ophi->outcnt()-1; j >= 0;) {

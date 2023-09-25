@@ -1518,7 +1518,6 @@ static bool stable_phi(PhiNode* phi, PhaseGVN *phase) {
   return true;
 }
 
-
 static bool can_split_through_phi_helper(Node *base, Node *mem) {
   bool base_is_phi = (base != nullptr) && base->is_Phi();
   if (!base_is_phi) {
@@ -1558,16 +1557,12 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
     for(uint i = 1; i < base->req(); i++) {
        if (base->in(i)->is_Phi()) {
          parent_phi = base->in(i);
-         break;
+         Node *memForLoadAfterOpt = MemNodeForNestedPhiLoadAfterOpt(phase, base, parent_phi);
+         if (!memForLoadAfterOpt || !can_split_through_phi_helper(parent_phi, memForLoadAfterOpt)) {
+          return false;
+         }
        }
-    }
-    if (!parent_phi) {
-     return false;
-    }
-    Node *memForLoadAfterOpt = MemNodeForNestedPhiLoadAfterOpt(phase, base, parent_phi);
-    if (!memForLoadAfterOpt || !can_split_through_phi_helper(parent_phi, memForLoadAfterOpt)) {
-     return false;
-    }
+    }   
   }
   return true;
 }
@@ -1580,12 +1575,6 @@ Node *LoadNode::MemNodeForNestedPhiLoadAfterOpt(PhaseGVN* phase, const Node *bas
   Node *address    = in(Address);
   assert(basephi != nullptr && basephi->is_Phi(), "sanity");
   assert(base_parentphi != nullptr && base_parentphi->is_Phi(), "sanity");
-
-  if (!basephi || !basephi->is_Phi() ||
-      !base_parentphi || !base_parentphi->is_Phi()) {
-   return nullptr;
-  }
-
   // Select Region to split through.
   Node* region;
   if (!mem->is_Phi()) {
@@ -1623,7 +1612,7 @@ Node *LoadNode::MemNodeForNestedPhiLoadAfterOpt(PhaseGVN* phase, const Node *bas
       // Dead path?  Use a dead data op
       return C->top()->in(Memory);
     } else if (mem->is_Phi() && (mem->in(0) == region)) {
-	return mem->in(i);
+	      return mem->in(i);
     }
    }
   return mem;
