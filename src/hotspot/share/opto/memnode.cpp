@@ -1518,20 +1518,33 @@ static bool stable_phi(PhiNode* phi, PhaseGVN *phase) {
   return true;
 }
 
-static bool can_split_through_phi_helper(Node *base, Node *mem) {
+static Node* get_region_to_split_through(Node *base, Node *mem) {
   bool base_is_phi = (base != nullptr) && base->is_Phi();
-  if (!base_is_phi) {
-   return false;
-  }
+  if (!base && !base->is_Phi()) {
+   return nullptr;
+  }  
+  // Select Region to split through.
+  Node* region = nullptr;
   if (!mem->is_Phi()) {
-   if (!MemNode::all_controls_dominate(mem, base->in(0)))
-    return false;
+    region = base->in(0);
+    // Skip if the region dominates some control edge of the memory.
+    if (!MemNode::all_controls_dominate(mem, region))
+      return nullptr;
   } else if (base->in(0) != mem->in(0)) {
-    if (!MemNode::all_controls_dominate(mem, base->in(0))) {
-     return false;
+    assert(mem->is_Phi(), "sanity");
+    if (MemNode::all_controls_dominate(mem, base->in(0))) {
+      region = base->in(0);
+    } /*else if (MemNode::all_controls_dominate(address, mem->in(0))) {
+      region = mem->in(0);
+    }*/ else {
+      return nullptr; // complex graph
     }
+  } else {
+    assert(base->in(0) == mem->in(0), "sanity");
+    region = mem->in(0);
   }
-  return true;
+  
+  return region;
 }
 
 //------------------------------split_through_phi------------------------------
@@ -1548,7 +1561,7 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
   if (req() > 3) {
     return false;
   }
-  if (!can_split_through_phi_helper(base, mem)) {
+  if (!get_region_to_split_through(base, mem)) {
     return false;
   }
   if (nested) {
@@ -1558,7 +1571,7 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
        if (base->in(i)->is_Phi()) {
          parent_phi = base->in(i);
          Node *memForLoadAfterOpt = MemNodeForNestedPhiLoadAfterOpt(phase, base, parent_phi);
-         if (!memForLoadAfterOpt || !can_split_through_phi_helper(parent_phi, memForLoadAfterOpt)) {
+         if (!memForLoadAfterOpt || !get_region_to_split_through(parent_phi, memForLoadAfterOpt)) {
           return false;
          }
        }
@@ -1569,33 +1582,21 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
 
 // Pretend that optimization has happend on load fields and return the optimizaed load node 
 // return nullptr if optimization is impossible
-Node *LoadNode::MemNodeForNestedPhiLoadAfterOpt(PhaseGVN* phase, const Node *basephi, const Node* base_parentphi) {
+Node *LoadNode::MemNodeForNestedPhiLoadAfterOpt(PhaseGVN* phase, Node *basephi, Node* base_parentphi) {
   
   Node* mem        = in(Memory);
   Node *address    = in(Address);
   assert(basephi != nullptr && basephi->is_Phi(), "sanity");
   assert(base_parentphi != nullptr && base_parentphi->is_Phi(), "sanity");
-  // Select Region to split through.
-  Node* region;
-  if (!mem->is_Phi()) {
-    region = basephi->in(0);
-    // Skip if the region dominates some control edge of the memory.
-    if (!MemNode::all_controls_dominate(mem, region))
-      return nullptr;
-  } else if (basephi->in(0) != mem->in(0)) {
-    assert(mem->is_Phi(), "sanity");
-    if (MemNode::all_controls_dominate(mem, basephi->in(0))) {
-      region = basephi->in(0);
-    } else if (MemNode::all_controls_dominate(address, mem->in(0))) {
+  Node* region = get_region_to_split_through(basephi, mem);
+  if(!region && basephi->in(0) != mem->in(0)) {
+    if (MemNode::all_controls_dominate(address, mem->in(0))) {
       region = mem->in(0);
     } else {
-      return nullptr; // complex graph
+      return nullptr;
     }
-  } else {
-    assert(basephi->in(0) == mem->in(0), "sanity");
-    region = mem->in(0);
   }
-
+ 
   Compile* C = phase->C;
   for (uint i = 1; i < region->req(); i++) {
     Node* in = region->in(i);

@@ -249,7 +249,7 @@ public:
 
   // Return a memory node for load node after nested phi optimization
   // Calling code is resposible to cleanup (remove_dead_node) after use 
-  Node* MemNodeForNestedPhiLoadAfterOpt(PhaseGVN* phase, const Node *basephi, const Node* base_parentphi);
+  Node* MemNodeForNestedPhiLoadAfterOpt(PhaseGVN* phase, Node *basephi, Node* base_parentphi);
 
   // Split instance field load through Phi.
   Node* split_through_phi(PhaseGVN *phase, bool ignore_missing_instance_id = false);
