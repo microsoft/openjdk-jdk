@@ -279,7 +279,7 @@ public final class JDKEvents {
         if (FileIOStatistics.getTotalReadBytesForProcess() > 0) {
             t.begin();
             t.accRead = FileIOStatistics.getTotalReadBytesForProcess();
-            t.readRate = FileIOStatistics.getReadRateForPeriod();
+            t.readRate = FileIOStatistics.getAndResetReadRateForPeriod();
             t.commit();
         }
     }
@@ -289,7 +289,7 @@ public final class JDKEvents {
         if (FileIOStatistics.getTotalWriteBytesForProcess() > 0) {
             t.begin();
             t.accWrite = FileIOStatistics.getTotalWriteBytesForProcess();
-            t.writeRate = FileIOStatistics.getWriteRateForPeriod();
+            t.writeRate = FileIOStatistics.getAndResetWriteRateForPeriod();
             t.commit();
         }
     }

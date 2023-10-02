@@ -48,7 +48,7 @@ public final class FileIOStatistics {
         return totalReadBytesForPeriod.get();
     }
         
-    public static void setTotalReadBytesForPeriod(long bytesRead, long duration) {
+    public static void addTotalReadBytesForPeriod(long bytesRead, long duration) {
         totalReadDuration.addAndGet(duration);
         totalReadBytesForProcess.addAndGet(bytesRead);
         totalReadBytesForPeriod.addAndGet(bytesRead);
@@ -63,7 +63,7 @@ public final class FileIOStatistics {
      *
      * @return The read rate in bytes per second.
     */      
-    public static long getReadRateForPeriod() {
+    public static long getAndResetReadRateForPeriod() {
         long result = getTotalReadBytesForPeriod();
         long interval = getTotalReadDuration();
         totalReadBytesForPeriod.addAndGet(-result);
@@ -88,7 +88,7 @@ public final class FileIOStatistics {
         return totalWriteBytesForPeriod.get();
     }
 
-    public static long setTotalWriteBytesForPeriod(long bytesWritten, long duration) {
+    public static long addTotalWriteBytesForPeriod(long bytesWritten, long duration) {
         totalWriteDuration.addAndGet(duration);
         totalWriteBytesForProcess.addAndGet(bytesWritten);
         return totalWriteBytesForPeriod.addAndGet(bytesWritten);
@@ -103,7 +103,7 @@ public final class FileIOStatistics {
      *
      * @return The write rate in bytes per second.
     */     
-    public static long getWriteRateForPeriod() {
+    public static long getAndResetWriteRateForPeriod() {
         long result = getTotalWriteBytesForPeriod();
         long interval = getTotalWriteDuration();
         totalWriteBytesForPeriod.addAndGet(-result);       
