@@ -1511,6 +1511,8 @@ void Arguments::set_conservative_max_heap_alignment() {
 
 jint Arguments::set_ergonomics_flags() {
   GCConfig::initialize();
+  // Store the name of the selected GC
+  PropertyList_add(&_system_properties, new SystemProperty("java.vm.gc.name", GCConfig::gc_name(),  false));
 
   set_conservative_max_heap_alignment();
 

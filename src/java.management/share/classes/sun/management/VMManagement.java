@@ -74,6 +74,7 @@ public interface VMManagement {
     public long    getUptime();
     public int     getAvailableProcessors();
     public String  getErgonomicsProfile();
+    public String  getGCName();
 
     // Compilation Subsystem
     public String  getCompilerName();

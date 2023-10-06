@@ -34,6 +34,7 @@ class GCConfig : public AllStatic {
 private:
   static GCArguments* _arguments;
   static bool         _gc_selected_ergonomically;
+  static const char*  _gc_name;
 
   static void fail_if_non_included_gc_is_selected();
   static bool is_no_gc_selected();
@@ -53,6 +54,7 @@ public:
   static const char* hs_err_name(CollectedHeap::Name name);
 
   static GCArguments* arguments();
+  static const char* gc_name();
 };
 
 #endif // SHARE_GC_SHARED_GCCONFIG_HPP

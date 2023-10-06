@@ -205,6 +205,10 @@ class VMManagementImpl implements VMManagement {
         return System.getProperty("java.vm.ergonomics.profile");
     }
 
+    public String getGCName() {
+        return System.getProperty("java.vm.gc.name");
+    }
+
     // Compilation Subsystem
     public String   getCompilerName() {
         @SuppressWarnings("removal")
