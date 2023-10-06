@@ -43,6 +43,9 @@ public class AllocationMergesTests {
                                    "-XX:+ReduceAllocationMerges",
                                    "-XX:+TraceReduceAllocationMerges",
                                    "-XX:+DeoptimizeALot",
+                                   "-XX:CompileCommand=inline,*::charAt*",
+                                   "-XX:CompileCommand=inline,*PicturePositions::*",
+                                   "-XX:CompileCommand=inline,*Point::*",
                                    "-XX:CompileCommand=exclude,*::dummy*");
     }
 
@@ -108,9 +111,10 @@ public class AllocationMergesTests {
 
                 })
     public void runner(RunInfo info) {
+        invocations++;
         Random random = info.getRandom();
-        boolean cond1 = random.nextBoolean();
-        boolean cond2 = random.nextBoolean();
+        boolean cond1 = invocations % 2 == 0;
+        boolean cond2 = !cond1;
 
         int l = random.nextInt();
         int w = random.nextInt();
@@ -156,63 +160,35 @@ public class AllocationMergesTests {
         Asserts.assertEQ(testLoadInLoop_Interp(cond1, x, y),                        testLoadInLoop_C2(cond1, x, y));
         Asserts.assertEQ(testMergesAndMixedEscape_Interp(cond1, x, y),              testMergesAndMixedEscape_C2(cond1, x, y));
         Asserts.assertEQ(testSRAndNSR_NoTrap_Interp(cond1, x, y),                   testSRAndNSR_NoTrap_C2(cond1, x, y));
-        Asserts.assertEQ(testSRAndNSR_Trap_Interp(false, cond1, cond2, x, y),        
-			testSRAndNSR_Trap_C2(info.isTestC2Compiled("testSRAndNSR_Trap_C2"), cond1, cond2, x, y));
-	
-	Asserts.assertEQ(testString_one_Interp(cond1),                              testString_one_C2(cond1));
+        Asserts.assertEQ(testString_one_Interp(cond1),                              testString_one_C2(cond1));
         Asserts.assertEQ(testString_two_Interp(cond1),                              testString_two_C2(cond1));
-
+        Asserts.assertEQ(testSRAndNSR_Trap_Interp(false, cond1, cond2, x, y),       testSRAndNSR_Trap_C2(info.isTestC2Compiled("testSRAndNSR_Trap_C2"), cond1, cond2, x, y));
 
         var arr1 = testNestedObjectsArray_Interp(cond1, x, y);
         var arr2 = testNestedObjectsArray_C2(cond1, x, y);
-
         if (arr1.length != arr2.length) Asserts.fail("testNestedObjectsArray result size mismatch.");
         for (int i=0; i<arr1.length; i++) {
             if (!arr1[i].equals(arr2[i])) {
                 Asserts.fail("testNestedObjectsArray objects mismatch.");
             }
         }
-
        try{
-            Asserts.assertEQ(testRematerialize_SingleObj_Interp(cond1, x, y),
-                            testRematerialize_SingleObj_C2(cond1, x, y));
+            Asserts.assertEQ(testRematerialize_SingleObj_Interp(cond1, x, y),       testRematerialize_SingleObj_C2(cond1, x, y));
         }catch (Exception e) {}
-
-	Asserts.assertEQ(testRematerialize_TryCatch_Interp(cond1, l, x, y),
-			testRematerialize_TryCatch_C2(cond1, l, x, y));
-
-	Asserts.assertEQ(testMerge_TryCatchFinally_Interp(cond1, l, x, y),
-	                 testMerge_TryCatchFinally_C2(cond1, l, x, y));
-
-	Asserts.assertEQ(testRematerialize_MultiObj_Interp(cond1, cond2, x, y),
-	                 testRematerialize_MultiObj_C2(cond1, cond2, x, y));
-
-	Asserts.assertEQ(testGlobalEscapeInThread_Intrep(cond1, l, x, y),
-                         testGlobalEscapeInThread_C2(cond1, l, x, y));
-
-	Asserts.assertEQ(testGlobalEscapeInThreadWithSync_Intrep(cond1, x, y),
-	                 testGlobalEscapeInThreadWithSync_C2(cond1, x, y));
-
-	Asserts.assertEQ(testFieldEscapeWithMerge_Intrep(cond1, x, y),
-			testFieldEscapeWithMerge_C2(cond1, x, y)); 
-
-	Asserts.assertEQ(testNestedPhi_FieldLoad_Interp(cond1, cond2, x, y),
-                        testNestedPhi_FieldLoad_C2(cond1, cond2, x, y)); 
-
-	Asserts.assertEQ(testThreeLevelNestedPhi_Interp(cond1, cond2, x, y),
-	                 testThreeLevelNestedPhi_C2(cond1, cond2, x, y));
-	Asserts.assertEQ(testNestedPhiProcessOrder_Interp(cond1, cond2, x, y),
-	                 testNestedPhiProcessOrder_C2(cond1, cond2, x, y));
-	Asserts.assertEQ(testNestedPhi_TryCatch_Interp(cond1, cond2, x, y),
-                         testNestedPhi_TryCatch_C2(cond1, cond2, x, y));
-	Asserts.assertEQ(testBailOut_Interp(cond1, cond2, x, y),
-                         testBailOut_C2(cond1, cond2, x, y));
-	Asserts.assertEQ(testNestedPhiPolymorphic_Interp(cond1, cond2, x, y),
-                         testNestedPhiPolymorphic_C2(cond1, cond2, x, y));
-        Asserts.assertEQ(testNestedPhiWithTrap_Interp(cond1, cond2, x, y),
-                         testNestedPhiWithTrap_C2(cond1, cond2, x, y));
-        Asserts.assertEQ(testNestedPhiWithLamda_Interp(cond1, cond2, x, y),
-                         testNestedPhiWithLamda_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testRematerialize_TryCatch_Interp(cond1, l, x, y),         testRematerialize_TryCatch_C2(cond1, l, x, y));
+        Asserts.assertEQ(testMerge_TryCatchFinally_Interp(cond1, l, x, y),          testMerge_TryCatchFinally_C2(cond1, l, x, y));
+        Asserts.assertEQ(testRematerialize_MultiObj_Interp(cond1, cond2, x, y),     testRematerialize_MultiObj_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testGlobalEscapeInThread_Intrep(cond1, l, x, y),           testGlobalEscapeInThread_C2(cond1, l, x, y));
+        Asserts.assertEQ(testGlobalEscapeInThreadWithSync_Intrep(cond1, x, y),      testGlobalEscapeInThreadWithSync_C2(cond1, x, y));
+        Asserts.assertEQ(testFieldEscapeWithMerge_Intrep(cond1, x, y),              testFieldEscapeWithMerge_C2(cond1, x, y)); 
+        Asserts.assertEQ(testNestedPhi_FieldLoad_Interp(cond1, cond2, x, y),        testNestedPhi_FieldLoad_C2(cond1, cond2, x, y)); 
+        Asserts.assertEQ(testThreeLevelNestedPhi_Interp(cond1, cond2, x, y),        testThreeLevelNestedPhi_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testNestedPhiProcessOrder_Interp(cond1, cond2, x, y),      testNestedPhiProcessOrder_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testNestedPhi_TryCatch_Interp(cond1, cond2, x, y),         testNestedPhi_TryCatch_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testBailOut_Interp(cond1, cond2, x, y),                    testBailOut_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testNestedPhiPolymorphic_Interp(cond1, cond2, x, y),       testNestedPhiPolymorphic_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testNestedPhiWithTrap_Interp(cond1, cond2, x, y),          testNestedPhiWithTrap_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testNestedPhiWithLamda_Interp(cond1, cond2, x, y),         testNestedPhiWithLamda_C2(cond1, cond2, x, y));
     }
 
     // -------------------------------------------------------------------------
@@ -608,9 +584,10 @@ public class AllocationMergesTests {
             new F();
         }
 
+        int res = s.a;
         dummy();
 
-        return s.a;
+        return res;
     }
 
     @Test
@@ -1253,12 +1230,13 @@ public class AllocationMergesTests {
             global_escape = p;
         }
 
+        int res = p.x;
         if (is_c2) {
             // This will show up to C2 as a trap.
             dummy_defaults();
         }
 
-        return p.y;
+        return res;
     }
 
     @Test
@@ -1320,8 +1298,8 @@ public class AllocationMergesTests {
             global_escape = p;
         }
 
-	if(!cond1)
-		throw new Exception();
+    if(!cond1)
+        throw new Exception();
 
         return p.y;
     }
@@ -1338,15 +1316,15 @@ public class AllocationMergesTests {
     @ForceInline
     int testRematerialize_TryCatch(boolean cond1, int n, int x, int y) {
         Point p = new Point(x, y);
-	    if (cond1) {
-		    p = new Point(x+1, y+1);
-		    global_escape = p;
-	    }
-	    try {
-		    p.y = n/0;
-	    }catch (Exception e) {}
+        if (cond1) {
+            p = new Point(x+1, y+1);
+            global_escape = p;
+        }
+        try {
+            p.y = n/0;
+        }catch (Exception e) {}
 
-	    return p.y;
+        return p.y;
     }
 
     @Test
@@ -1497,11 +1475,11 @@ public class AllocationMergesTests {
         if (cond1) {
          p1 = new Point(x+30, y+40);
         }
-	Point p2 = p1;
-	if (cond2) {
-  	  p2 = new Point(x+50, y+60);
-	}
-	return  p2.x + p2.y;
+    Point p2 = p1;
+    if (cond2) {
+      p2 = new Point(x+50, y+60);
+    }
+    return  p2.x + p2.y;
     }
 
     @Test
@@ -1723,32 +1701,32 @@ public class AllocationMergesTests {
             Point p = (Point) o;
             return (p.x == x) && (p.y == y);
         }
-	int getX() {
-	   return x;
-	}
+    int getX() {
+       return x;
+    }
     }
    
    class Line {
-	Point p1, p2;
-	Line(Point p1, Point p2) {
-	   this.p1 = p1;
-	   this.p2 = p2;
-	}
+    Point p1, p2;
+    Line(Point p1, Point p2) {
+       this.p1 = p1;
+       this.p2 = p2;
+    }
    }
 
     interface PointSupplier {
-	Point1 getPoint();
+    Point1 getPoint();
     }
    
    class Point1 implements PointSupplier {
-	int x, y;
-	Point1(int x, int y) {
-	    this.x = x;
-	    this.y = y;
-	}
-	public Point1 getPoint() {
-	    return this;
-	}
+    int x, y;
+    Point1(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+    public Point1 getPoint() {
+        return this;
+    }
     }
 
     class Shape {
@@ -1856,21 +1834,21 @@ public class AllocationMergesTests {
     }
 
     class TestThread extends Thread {
-	private static Object syncObject = new Object();
-	Point   p;
-	
-	TestThread(Point p) {
-		this.p = p;
-	}
-	
-	public void run() {
-		try {
-			synchronized(syncObject) {
-				p = new Point(1,1);
-				global_escape = p;
-			}
-		} catch(Exception e){}
-	}
+    private static Object syncObject = new Object();
+    Point   p;
+    
+    TestThread(Point p) {
+        this.p = p;
+    }
+    
+    public void run() {
+        try {
+            synchronized(syncObject) {
+                p = new Point(1,1);
+                global_escape = p;
+            }
+        } catch(Exception e){}
+    }
     }
 
     class A { }

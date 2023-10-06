@@ -1534,13 +1534,10 @@ static Node* get_region_to_split_through(Node *base, Node *mem) {
     assert(mem->is_Phi(), "sanity");
     if (MemNode::all_controls_dominate(mem, base->in(0))) {
       region = base->in(0);
-    } /*else if (MemNode::all_controls_dominate(address, mem->in(0))) {
-      region = mem->in(0);
-    }*/ else {
+    } else {
       return nullptr; // complex graph
     }
   } else {
-    assert(base->in(0) == mem->in(0), "sanity");
     region = mem->in(0);
   }
   
@@ -1558,10 +1555,7 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
   intptr_t ignore  = 0;
   Node*    base    = AddPNode::Ideal_base_and_offset(address, phase, ignore);
 
-  if (req() > 3) {
-    return false;
-  }
-  if (!get_region_to_split_through(base, mem)) {
+  if (req() > 3 || !get_region_to_split_through(base, mem)) {
     return false;
   }
   if (nested) {
