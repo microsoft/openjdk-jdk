@@ -44,6 +44,10 @@ class os::win32 {
   static bool   _is_windows_server;
   static bool   _has_exit_bug;
 
+  static int    _major_version;
+  static int    _minor_version;
+  static int    _build_number;
+
   static void print_windows_version(outputStream* st);
   static void print_uptime_info(outputStream* st);
 
@@ -56,6 +60,8 @@ class os::win32 {
   // Windows-specific interface:
   static void   initialize_system_info();
   static void   setmode_streams();
+  static void   compute_windows_version();
+  static bool   schedules_all_processor_groups();
 
   // Processor info as provided by NT
   static int processor_type()  { return _processor_type;  }

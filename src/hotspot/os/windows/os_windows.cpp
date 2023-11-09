@@ -3983,14 +3983,152 @@ bool   os::win32::_is_windows_server         = false;
 // including the latest one (as of this writing - Windows Server 2012 R2)
 bool   os::win32::_has_exit_bug              = true;
 
+int    os::win32::_major_version             = 0;
+int    os::win32::_minor_version             = 0;
+int    os::win32::_build_number              = 0;
+
+void os::win32::compute_windows_version() {
+  LPWSTR kernel32_path = NULL;
+  LPWSTR version_info = NULL;
+  DWORD version_size = 0;
+
+  // Get the full path to \Windows\System32\kernel32.dll and use that for
+  // determining what version of Windows we're running on. This is the same
+  // approach used in src/java.base/windows/native/libjava/java_props_md.c
+  UINT buffer_size = GetSystemDirectoryW(NULL, 0);
+  if (buffer_size == 0) {
+    warning("GetSystemDirectoryW() failed: GetLastError->%ld.", GetLastError());
+    return;
+  }
+
+  UINT filename_chars = (UINT)strlen("\\kernel32.dll");
+
+  // buffer_size includes the terminating null character
+  UINT size = (buffer_size + filename_chars) * sizeof(WCHAR);
+  kernel32_path = (LPWSTR)os::malloc(size, mtInternal);
+  if (kernel32_path == NULL) {
+      warning("os::malloc() failed to allocate %ld bytes for the kernel32.dll path", size);
+      return;
+  }
+
+  UINT non_null_chars_written = GetSystemDirectoryW(kernel32_path, size);
+  if (non_null_chars_written == 0) {
+    warning("GetSystemDirectoryW() failed: GetLastError->%ld.", GetLastError());
+    goto free_mem;
+  }
+
+  wcsncat(kernel32_path, L"\\kernel32.dll", filename_chars);
+
+  version_size = GetFileVersionInfoSizeW(kernel32_path, NULL);
+  if (version_size == 0) {
+    warning("GetFileVersionInfoSizeW() failed: GetLastError->%ld.", GetLastError());
+    goto free_mem;
+  }
+
+  version_info = (LPWSTR)os::malloc(version_size, mtInternal);
+  if (version_info == NULL) {
+    warning("os::malloc() failed to allocate %ld bytes for GetFileVersionInfoW buffer", version_size);
+    goto free_mem;
+  }
+
+  if (!GetFileVersionInfoW(kernel32_path, 0, version_size, version_info)) {
+    warning("GetFileVersionInfoW() failed: GetLastError->%ld.", GetLastError());
+    goto free_mem;
+  }
+
+  VS_FIXEDFILEINFO *file_info;
+  if (!VerQueryValueW(version_info, L"\\", (LPVOID*)&file_info, &size)) {
+    warning("VerQueryValueW() failed. Cannot determine Windows version.");
+    goto free_mem;
+  }
+
+  _major_version = HIWORD(file_info->dwProductVersionMS);
+  _minor_version = LOWORD(file_info->dwProductVersionMS);
+  _build_number  = HIWORD(file_info->dwProductVersionLS);
+
+free_mem:
+  os::free(version_info);
+  os::free(kernel32_path);
+}
+
+bool os::win32::schedules_all_processor_groups() {
+  // Starting with Windows 11 and Windows Server 2022 the OS has changed to
+  // make processes and their threads span all processors in the system,
+  // across all processor groups, by default. Therefore, this function needs
+  // to detect Windows 11 or Windows Server 2022. See
+  // https://learn.microsoft.com/en-us/windows/win32/procthread/processor-groups#behavior-starting-with-windows-11-and-windows-server-2022
+
+  if (IsWindows10OrGreater()) {
+    if (IsWindowsServer()) {
+      // Windows Server 2022 starts at build 20348.169 as per
+      // https://learn.microsoft.com/en-us/windows/release-health/release-information
+      return _build_number >= 20348;
+    } else {
+      // Windows 11 starts at build 22000 (Version 21H2) as per
+      // https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
+      return _build_number >= 22000;
+    }
+  }
+
+  return false;
+}
+
 void os::win32::initialize_system_info() {
+  compute_windows_version();
+
   SYSTEM_INFO si;
   GetSystemInfo(&si);
   OSInfo::set_vm_page_size(si.dwPageSize);
   OSInfo::set_vm_allocation_granularity(si.dwAllocationGranularity);
   _processor_type  = si.dwProcessorType;
   _processor_level = si.wProcessorLevel;
-  set_processor_count(si.dwNumberOfProcessors);
+
+  DWORD logicalProcessors = 0;
+  typedef BOOL(WINAPI* LPFN_GET_LOGICAL_PROCESSOR_INFORMATION_EX)(
+      LOGICAL_PROCESSOR_RELATIONSHIP, PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, PDWORD);
+
+  LPFN_GET_LOGICAL_PROCESSOR_INFORMATION_EX glpiex;
+
+  glpiex = (LPFN_GET_LOGICAL_PROCESSOR_INFORMATION_EX)GetProcAddress(
+      GetModuleHandle(TEXT("kernel32")),
+      "GetLogicalProcessorInformationEx");
+
+  if (glpiex != NULL && schedules_all_processor_groups()) {
+    LOGICAL_PROCESSOR_RELATIONSHIP relationshipType = RelationGroup;
+    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX pSytemLogicalProcessorInfo = NULL;
+    DWORD returnedLength = 0;
+
+    // https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getlogicalprocessorinformationex
+    if (!glpiex(relationshipType, pSytemLogicalProcessorInfo, &returnedLength)) {
+      DWORD lastError = GetLastError();
+
+      if (lastError == ERROR_INSUFFICIENT_BUFFER) {
+        pSytemLogicalProcessorInfo = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)os::malloc(returnedLength, mtInternal);
+
+        if (NULL == pSytemLogicalProcessorInfo) {
+          warning("os::malloc() failed to allocate %ld bytes for GetLogicalProcessorInformationEx buffer", returnedLength);
+        } else if (!glpiex(relationshipType, pSytemLogicalProcessorInfo, &returnedLength)) {
+          warning("GetLogicalProcessorInformationEx() failed: GetLastError->%ld.", GetLastError());
+        } else {
+          DWORD processorGroups = pSytemLogicalProcessorInfo->Group.ActiveGroupCount;
+
+          for (DWORD i = 0; i < processorGroups; i++) {
+            PROCESSOR_GROUP_INFO groupInfo = pSytemLogicalProcessorInfo->Group.GroupInfo[i];
+            logicalProcessors += groupInfo.ActiveProcessorCount;
+          }
+
+          assert(logicalProcessors > 0, "Must find at least 1 logical processor");
+        }
+
+        os::free(pSytemLogicalProcessorInfo);
+      }
+      else {
+        warning("GetLogicalProcessorInformationEx() failed: GetLastError->%ld.", lastError);
+      }
+    }
+  }
+
+  set_processor_count(logicalProcessors > 0 ? logicalProcessors : si.dwNumberOfProcessors);
 
   MEMORYSTATUSEX ms;
   ms.dwLength = sizeof(ms);
