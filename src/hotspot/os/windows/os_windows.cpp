@@ -894,38 +894,18 @@ int os::active_processor_count() {
     return ActiveProcessorCount;
   }
 
+  // Starting with Windows 11 and Windows Server 2022, the OS has changed to
+  // make processes and their threads span all processors in the system,
+  // across all processor groups, by default. Therefore, we will allow all
+  // processors to be active processors on these operating systems. However,
+  // job objects can be used to restrict processor affinity across the
+  // processor groups. In this case, the number of active processors must be
+  // obtained from the processor affinity in the job object.
   bool schedules_all_processor_groups = win32::is_windows_11_or_greater() || win32::is_windows_server_2022_or_greater();
-  if (UseAllWindowsProcessorGroups && !schedules_all_processor_groups && !win32::processor_group_warning_displayed()) {
-    win32::set_processor_group_warning_displayed(true);
-    FLAG_SET_DEFAULT(UseAllWindowsProcessorGroups, false);
-    warning("The UseAllWindowsProcessorGroups flag is not supported on this Windows version and will be ignored.");
-  }
+  if (schedules_all_processor_groups) {
+    DWORD processors_in_job_object = win32::active_processors_in_job_object();
 
-  DWORD active_processor_groups = 0;
-  DWORD processors_in_job_object = win32::active_processors_in_job_object(&active_processor_groups);
-
-  if (processors_in_job_object > 0) {
-    if (schedules_all_processor_groups) {
-      // If UseAllWindowsProcessorGroups is enabled then all the processors in the job object
-      // can be used. Otherwise, we will fall through to inspecting the process affinity mask.
-      // This will result in using only the subset of the processors in the default processor
-      // group allowed by the job object i.e. only 1 processor group will be used and only
-      // the processors in that group that are allowed by the job object will be used.
-      // This preserves the behavior where older OpenJDK versions always used one processor
-      // group regardless of whether they were launched in a job object.
-      if (!UseAllWindowsProcessorGroups && active_processor_groups > 1) {
-        if (!win32::job_object_processor_group_warning_displayed()) {
-          win32::set_job_object_processor_group_warning_displayed(true);
-          warning("The Windows job object has enabled multiple processor groups (%d) but the UseAllWindowsProcessorGroups flag is off. Some processors might not be used.", active_processor_groups);
-        }
-      } else {
-        return processors_in_job_object;
-      }
-    } else {
-      if (active_processor_groups > 1 && !win32::job_object_processor_group_warning_displayed()) {
-        win32::set_job_object_processor_group_warning_displayed(true);
-        warning("The Windows job object has enabled multiple processor groups (%d) but only 1 is supported on this Windows version. Some processors might not be used.", active_processor_groups);
-      }
+    if (processors_in_job_object > 0) {
       return processors_in_job_object;
     }
   }
@@ -934,76 +914,31 @@ int os::active_processor_count() {
   SYSTEM_INFO si;
   GetSystemInfo(&si);
 
-  USHORT group_count = 0;
-  bool use_process_affinity_mask = false;
-  bool got_process_group_affinity = false;
+  // There is no associated job object so get the number of available logical processors from the process affinity mask
+  DWORD_PTR lpProcessAffinityMask = 0;
+  DWORD_PTR lpSystemAffinityMask = 0;
+  if (GetProcessAffinityMask(GetCurrentProcess(), &lpProcessAffinityMask, &lpSystemAffinityMask)) {
+    logical_processors = population_count(lpProcessAffinityMask);
 
-  if (GetProcessGroupAffinity(GetCurrentProcess(), &group_count, nullptr) == 0) {
-    DWORD last_error = GetLastError();
-    if (last_error == ERROR_INSUFFICIENT_BUFFER) {
-      if (group_count > 0) {
-        got_process_group_affinity = true;
-
-        if (group_count == 1) {
-          use_process_affinity_mask = true;
-        }
-      } else {
-        warning("Unexpected group count of 0 from GetProcessGroupAffinity.");
-        assert(false, "Group count must not be 0.");
-      }
-    } else {
-      char buf[512];
-      size_t buf_len = os::lasterror(buf, sizeof(buf));
-      warning("Attempt to get process group affinity failed: %s", buf_len != 0 ? buf : "<unknown error>");
+    if (logical_processors < si.dwNumberOfProcessors) {
+      // Respect the custom processor affinity since it is not equal to all processors in the current processor group
+      return logical_processors;
     }
   } else {
-    warning("Unexpected GetProcessGroupAffinity success result.");
-    assert(false, "Unexpected GetProcessGroupAffinity success result");
+    warning("GetProcessAffinityMask() failed: GetLastError->%ld.", GetLastError());
   }
 
-  // Fall back to SYSTEM_INFO.dwNumberOfProcessors if the process group affinity could not be determined.
-  if (!got_process_group_affinity) {
-    return si.dwNumberOfProcessors;
-  }
-
-  // If the process it not in a job and the process group affinity is exactly 1 group
-  // then get the number of available logical processors from the process affinity mask
-  if (use_process_affinity_mask) {
-    DWORD_PTR lpProcessAffinityMask = 0;
-    DWORD_PTR lpSystemAffinityMask = 0;
-    if (GetProcessAffinityMask(GetCurrentProcess(), &lpProcessAffinityMask, &lpSystemAffinityMask) != 0) {
-      // Number of active processors is number of bits in process affinity mask
-      logical_processors = population_count(lpProcessAffinityMask);
-
-      if (logical_processors > 0) {
-        return logical_processors;
-      } else {
-        // We only check the process affinity mask if GetProcessGroupAffinity determined that there was
-        // only 1 active group. In this case, GetProcessAffinityMask will not set the affinity mask to 0.
-        warning("Unexpected process affinity mask of 0 from GetProcessAffinityMask.");
-        assert(false, "Found unexpected process affinity mask: 0");
-      }
-    } else {
-      char buf[512];
-      size_t buf_len = os::lasterror(buf, sizeof(buf));
-      warning("Attempt to get the process affinity mask failed: %s", buf_len != 0 ? buf : "<unknown error>");
-    }
-
-    // Fall back to SYSTEM_INFO.dwNumberOfProcessors if the process affinity mask could not be determined.
-    return si.dwNumberOfProcessors;
-  }
-
-  if (UseAllWindowsProcessorGroups) {
-    // There are no processor affinity restrictions at this point so we can return
-    // the overall processor count if the OS automatically schedules threads across
-    // all processors on the system. Note that older operating systems can
-    // correctly report processor count but will not schedule threads across
-    // processor groups unless the application explicitly uses group affinity APIs
-    // to assign threads to processor groups. On these older operating systems, we
-    // will continue to use the dwNumberOfProcessors field.
-    if (schedules_all_processor_groups) {
-      logical_processors = processor_count();
-    }
+  // There are no processor affinity restrictions at this point so we can return
+  // the overall processor count if the OS automatically schedules threads across
+  // all processors on the system. Note that older operating systems can
+  // correctly report processor count but will not schedule threads across
+  // processor groups unless the application explicitly uses group affinity APIs
+  // to assign threads to processor groups. On these older operating systems, we
+  // will continue to use the dwNumberOfProcessors field. For details on the
+  // latest Windows scheduling behavior, see
+  // https://learn.microsoft.com/en-us/windows/win32/procthread/processor-groups#behavior-starting-with-windows-11-and-windows-server-2022
+  if (schedules_all_processor_groups) {
+    logical_processors = processor_count();
   }
 
   return logical_processors == 0 ? si.dwNumberOfProcessors : logical_processors;
@@ -4086,32 +4021,30 @@ int    os::win32::_minor_version             = 0;
 int    os::win32::_build_number              = 0;
 int    os::win32::_build_minor               = 0;
 
-bool   os::win32::_processor_group_warning_displayed = false;
-bool   os::win32::_job_object_processor_group_warning_displayed = false;
-
 void os::win32::initialize_windows_version() {
-  assert(_major_version == 0, "windows version already initialized.");
+  if (_major_version > 0) {
+    return; // nothing to do if the version has already been set
+  }
 
   VS_FIXEDFILEINFO *file_info;
   TCHAR kernel32_path[MAX_PATH];
   UINT len, ret;
-  char error_msg_buffer[512];
+
+  bool is_workstation = !IsWindowsServer();
 
   // Get the full path to \Windows\System32\kernel32.dll and use that for
   // determining what version of Windows we're running on.
   len = MAX_PATH - (UINT)strlen("\\kernel32.dll") - 1;
   ret = GetSystemDirectory(kernel32_path, len);
   if (ret == 0 || ret > len) {
-    size_t buf_len = os::lasterror(error_msg_buffer, sizeof(error_msg_buffer));
-    warning("Attempt to determine system directory failed: %s", buf_len != 0 ? error_msg_buffer : "<unknown error>");
+    warning("GetSystemDirectory() failed: GetLastError->%ld.", GetLastError());
     return;
   }
   strncat(kernel32_path, "\\kernel32.dll", MAX_PATH - ret);
 
   DWORD version_size = GetFileVersionInfoSize(kernel32_path, nullptr);
   if (version_size == 0) {
-    size_t buf_len = os::lasterror(error_msg_buffer, sizeof(error_msg_buffer));
-    warning("Failed to determine whether the OS can retrieve version information from kernel32.dll: %s", buf_len != 0 ? error_msg_buffer : "<unknown error>");
+    warning("GetFileVersionInfoSize() failed: GetLastError->%ld.", GetLastError());
     return;
   }
 
@@ -4121,17 +4054,15 @@ void os::win32::initialize_windows_version() {
     return;
   }
 
-  if (GetFileVersionInfo(kernel32_path, 0, version_size, version_info) == 0) {
+  if (!GetFileVersionInfo(kernel32_path, 0, version_size, version_info)) {
     os::free(version_info);
-    size_t buf_len = os::lasterror(error_msg_buffer, sizeof(error_msg_buffer));
-    warning("Attempt to retrieve version information from kernel32.dll failed: %s", buf_len != 0 ? error_msg_buffer : "<unknown error>");
+    warning("GetFileVersionInfo() failed: GetLastError->%ld.", GetLastError());
     return;
   }
 
-  if (VerQueryValue(version_info, TEXT("\\"), (LPVOID*)&file_info, &len) == 0) {
+  if (!VerQueryValue(version_info, TEXT("\\"), (LPVOID*)&file_info, &len)) {
     os::free(version_info);
-    size_t buf_len = os::lasterror(error_msg_buffer, sizeof(error_msg_buffer));
-    warning("Attempt to determine Windows version from kernel32.dll failed: %s", buf_len != 0 ? error_msg_buffer : "<unknown error>");
+    warning("VerQueryValue() failed. Cannot determine Windows version.");
     return;
   }
 
@@ -4139,37 +4070,24 @@ void os::win32::initialize_windows_version() {
   _minor_version = LOWORD(file_info->dwProductVersionMS);
   _build_number  = HIWORD(file_info->dwProductVersionLS);
   _build_minor   = LOWORD(file_info->dwProductVersionLS);
-
-  os::free(version_info);
 }
 
 bool os::win32::is_windows_11_or_greater() {
-  if (IsWindowsServer()) {
-    return false;
-  }
-
-  // Windows 11 starts at build 22000 (Version 21H2)
-  return (windows_major_version() == 10 && windows_build_number() >= 22000) || (windows_major_version() > 10);
+  // Windows 11 starts at build 22000 (Version 21H2) as per
+  // https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
+  return (windows_major_version() >= 10 && windows_build_number() >= 22000 && !IsWindowsServer());
 }
 
 bool os::win32::is_windows_server_2022_or_greater() {
-  if (!IsWindowsServer()) {
-    return false;
-  }
-
-  // Windows Server 2022 starts at build 20348.169
-  return (windows_major_version() == 10 && windows_build_number() >= 20348) || (windows_major_version() > 10);
+  // Windows Server 2022 starts at build 20348.169 as per
+  // https://learn.microsoft.com/en-us/windows/release-health/release-information
+  return (windows_major_version() >= 10 && windows_build_number() >= 20348 && IsWindowsServer());
 }
 
-DWORD os::win32::active_processors_in_job_object(DWORD* active_processor_groups) {
-  if (active_processor_groups != nullptr) {
-    *active_processor_groups = 0;
-  }
+DWORD os::win32::active_processors_in_job_object() {
   BOOL is_in_job_object = false;
-  if (IsProcessInJob(GetCurrentProcess(), nullptr, &is_in_job_object) == 0) {
-    char buf[512];
-    size_t buf_len = os::lasterror(buf, sizeof(buf));
-    warning("Attempt to determine whether the process is running in a job failed: %s", buf_len != 0 ? buf : "<unknown error>");
+  if (!IsProcessInJob(GetCurrentProcess(), nullptr, &is_in_job_object)) {
+    warning("IsProcessInJob() failed: GetLastError->%ld.", GetLastError());
     return 0;
   }
 
@@ -4182,61 +4100,88 @@ DWORD os::win32::active_processors_in_job_object(DWORD* active_processor_groups)
   LPVOID job_object_information = nullptr;
   DWORD job_object_information_length = 0;
 
-  if (QueryInformationJobObject(nullptr, JobObjectGroupInformationEx, nullptr, 0, &job_object_information_length) != 0) {
-    warning("Unexpected QueryInformationJobObject success result.");
-    assert(false, "Unexpected QueryInformationJobObject success result");
-    return 0;
-  }
+  if (!QueryInformationJobObject(nullptr, JobObjectGroupInformationEx, nullptr, 0, &job_object_information_length)) {
+    DWORD last_error = GetLastError();
+    if (last_error == ERROR_INSUFFICIENT_BUFFER) {
+      DWORD group_count = job_object_information_length / sizeof(GROUP_AFFINITY);
 
-  DWORD last_error = GetLastError();
-  if (last_error == ERROR_INSUFFICIENT_BUFFER) {
-    DWORD group_count = job_object_information_length / sizeof(GROUP_AFFINITY);
+      job_object_information = os::malloc(job_object_information_length, mtInternal);
+      if (job_object_information != nullptr) {
+          if (QueryInformationJobObject(nullptr, JobObjectGroupInformationEx, job_object_information, job_object_information_length, &job_object_information_length)) {
+            assert(group_count == job_object_information_length / sizeof(GROUP_AFFINITY), "Unexpected group count");
 
-    job_object_information = os::malloc(job_object_information_length, mtInternal);
-    if (job_object_information != nullptr) {
-        if (QueryInformationJobObject(nullptr, JobObjectGroupInformationEx, job_object_information, job_object_information_length, &job_object_information_length) != 0) {
-          DWORD groups_found = job_object_information_length / sizeof(GROUP_AFFINITY);
-          if (groups_found != group_count) {
-            warning("Unexpected processor group count: %ld. Expected %ld processor groups.", groups_found, group_count);
-            assert(false, "Unexpected group count");
-          }
-
-          GROUP_AFFINITY* group_affinity_data = ((GROUP_AFFINITY*)job_object_information);
-          for (DWORD i = 0; i < groups_found; i++, group_affinity_data++) {
-            DWORD processors_in_group = population_count(group_affinity_data->Mask);
-            processors += processors_in_group;
-            if (active_processor_groups != nullptr && processors_in_group > 0) {
-              (*active_processor_groups)++;
+            for (DWORD i = 0; i < group_count; i++) {
+              KAFFINITY group_affinity = ((GROUP_AFFINITY*)job_object_information)[i].Mask;
+              processors += population_count(group_affinity);
             }
+
+            assert(processors > 0, "Must find at least 1 logical processor");
+          } else {
+            warning("QueryInformationJobObject() failed: GetLastError->%ld.", GetLastError());
           }
 
-          if (processors == 0) {
-            warning("Could not determine processor count from the job object.");
-            assert(false, "Must find at least 1 logical processor");
-          }
-        } else {
-          char buf[512];
-          size_t buf_len = os::lasterror(buf, sizeof(buf));
-          warning("Attempt to query job object information failed: %s", buf_len != 0 ? buf : "<unknown error>");
-        }
-
-        os::free(job_object_information);
-    } else {
-        warning("os::malloc() failed to allocate %ld bytes for QueryInformationJobObject", job_object_information_length);
+          os::free(job_object_information);
+      } else {
+          warning("os::malloc() failed to allocate %ld bytes for QueryInformationJobObject", job_object_information_length);
+      }
     }
-  } else {
-    char buf[512];
-    size_t buf_len = os::lasterror(buf, sizeof(buf));
-    warning("Attempt to query job object information failed: %s", buf_len != 0 ? buf : "<unknown error>");
-    assert(false, "Unexpected QueryInformationJobObject error code");
-    return 0;
   }
 
-  log_debug(os)("Process is running in a job with %d active processors.", processors);
   return processors;
 }
 
+DWORD os::win32::system_logical_processor_count() {
+  DWORD logical_processors = 0;
+  typedef BOOL(WINAPI* LPFN_GET_LOGICAL_PROCESSOR_INFORMATION_EX)(
+      LOGICAL_PROCESSOR_RELATIONSHIP, PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, PDWORD);
+
+  LPFN_GET_LOGICAL_PROCESSOR_INFORMATION_EX glpiex;
+
+  glpiex = (LPFN_GET_LOGICAL_PROCESSOR_INFORMATION_EX)GetProcAddress(
+      GetModuleHandle(TEXT("kernel32")),
+      "GetLogicalProcessorInformationEx");
+
+  if (glpiex != nullptr) {
+    LOGICAL_PROCESSOR_RELATIONSHIP relationship_type = RelationGroup;
+    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX system_logical_processor_info = nullptr;
+    DWORD returned_length = 0;
+
+    // https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getlogicalprocessorinformationex
+    if (!glpiex(relationship_type, nullptr, &returned_length)) {
+      DWORD last_error = GetLastError();
+
+      if (last_error == ERROR_INSUFFICIENT_BUFFER) {
+        system_logical_processor_info = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)os::malloc(returned_length, mtInternal);
+
+        if (nullptr == system_logical_processor_info) {
+          warning("os::malloc() failed to allocate %ld bytes for GetLogicalProcessorInformationEx buffer", returned_length);
+        } else if (!glpiex(relationship_type, system_logical_processor_info, &returned_length)) {
+          warning("GetLogicalProcessorInformationEx() failed: GetLastError->%ld.", GetLastError());
+        } else {
+          DWORD processor_groups = system_logical_processor_info->Group.ActiveGroupCount;
+
+          for (DWORD i = 0; i < processor_groups; i++) {
+            PROCESSOR_GROUP_INFO group_info = system_logical_processor_info->Group.GroupInfo[i];
+            logical_processors += group_info.ActiveProcessorCount;
+          }
+
+          assert(logical_processors > 0, "Must find at least 1 logical processor");
+        }
+
+        os::free(system_logical_processor_info);
+      }
+      else {
+        warning("GetLogicalProcessorInformationEx() failed: GetLastError->%ld.", last_error);
+      }
+    }
+  }
+
+  return logical_processors;
+}
+
 void os::win32::initialize_system_info() {
+  initialize_windows_version();
+
   SYSTEM_INFO si;
   GetSystemInfo(&si);
   OSInfo::set_vm_page_size(si.dwPageSize);
@@ -4247,13 +4192,7 @@ void os::win32::initialize_system_info() {
   DWORD processors = 0;
   bool schedules_all_processor_groups = win32::is_windows_11_or_greater() || win32::is_windows_server_2022_or_greater();
   if (schedules_all_processor_groups) {
-    processors = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
-    if (processors == 0) {
-      char buf[512];
-      size_t buf_len = os::lasterror(buf, sizeof(buf));
-      warning("Attempt to determine the processor count from GetActiveProcessorCount() failed: %s", buf_len != 0 ? buf : "<unknown error>");
-      assert(false, "Must find at least 1 logical processor");
-    }
+    processors = system_logical_processor_count();
   }
 
   set_processor_count(processors > 0 ? processors : si.dwNumberOfProcessors);

@@ -51,6 +51,11 @@ class os::win32 {
   static int    _build_number;
   static int    _build_minor;
 
+  static int    _major_version;
+  static int    _minor_version;
+  static int    _build_number;
+  static int    _build_minor;
+
   static void print_windows_version(outputStream* st);
   static void print_uptime_info(outputStream* st);
 
@@ -65,34 +70,22 @@ class os::win32 {
   static void   setmode_streams();
   static bool   is_windows_11_or_greater();
   static bool   is_windows_server_2022_or_greater();
+  static DWORD  system_logical_processor_count();
   static int windows_major_version() {
-    assert(_major_version > 0, "windows version not initialized.");
+    initialize_windows_version();
     return _major_version;
   }
   static int windows_minor_version() {
-    assert(_major_version > 0, "windows version not initialized.");
+    initialize_windows_version();
     return _minor_version;
   }
   static int windows_build_number() {
-    assert(_major_version > 0, "windows version not initialized.");
+    initialize_windows_version();
     return _build_number;
   }
   static int windows_build_minor() {
-    assert(_major_version > 0, "windows version not initialized.");
+    initialize_windows_version();
     return _build_minor;
-  }
-
-  static void set_processor_group_warning_displayed(bool displayed)  {
-    _processor_group_warning_displayed = displayed;
-  }
-  static bool processor_group_warning_displayed() {
-    return _processor_group_warning_displayed;
-  }
-  static void set_job_object_processor_group_warning_displayed(bool displayed)  {
-    _job_object_processor_group_warning_displayed = displayed;
-  }
-  static bool job_object_processor_group_warning_displayed() {
-    return _job_object_processor_group_warning_displayed;
   }
 
   // Processor info as provided by NT
@@ -111,7 +104,7 @@ class os::win32 {
 
   static void initialize_performance_counter();
   static void initialize_windows_version();
-  static DWORD active_processors_in_job_object(DWORD* active_processor_groups = nullptr);
+  static DWORD active_processors_in_job_object();
 
  public:
   // Generic interface:
