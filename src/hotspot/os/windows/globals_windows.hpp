@@ -36,6 +36,9 @@
                          range,                                           \
                          constraint)                                      \
                                                                           \
+product(int, ThreadGroupStrategy, -1,                                     \
+          "Specify the strategy for assigning threads to thread groups")  \
+                                                                          \
 product(bool, UseOSErrorReporting, false,                                 \
         "Let VM fatal error propagate to the OS (ie. WER on Windows)")
 

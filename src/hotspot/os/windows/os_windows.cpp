@@ -783,6 +783,66 @@ bool os::create_thread(Thread* thread, ThreadType thr_type,
   // Store info on the Win32 thread into the OSThread
   osthread->set_thread_handle(thread_handle);
   osthread->set_thread_id(thread_id);
+ 
+  if (os::win32::_handle_processor_groups) {
+    // Assign group affinity here
+
+    Atomic::inc(&os::win32::_created_thread_idx); // TODO: how do you get the old value? This API doesn't match AtomicInt.getAndIncrement
+    unsigned groups = os::win32::processor_group_count();
+
+    if (ThreadGroupStrategy == 1) {
+      unsigned group_index = os::random() % groups; // TODO: this is not necessarily a uniform distribution
+
+      PROCESSOR_GROUP_INFO groupInfo = os::win32::_pSytemLogicalProcessorInfo->Group.GroupInfo[group_index];
+      GROUP_AFFINITY groupAffinity {}; // Why {}?
+      groupAffinity.Mask = groupInfo.ActiveProcessorMask;
+      groupAffinity.Group = group_index;
+      if (!SetThreadGroupAffinity(thread_handle, &groupAffinity, NULL)) {
+        log_error(os)("SetThreadGroupAffinity(%d, {Group %d, Mask 0x%08llx}, NULL)) failed: GetLastError->%ld. _created_thread_idx is %d", thread_handle, group_index, groupInfo.ActiveProcessorMask, GetLastError(), os::win32::_created_thread_idx);
+
+        // Do not try setting thread group affinity again
+        os::win32::_handle_processor_groups = false;
+      } else {
+        if (!os::win32::_logged_custom_thread_affinity) {
+          log_info(os)("Thread group affinity manually set. Detected %lu groups.", groups);
+          os::win32::_logged_custom_thread_affinity = true;
+        }
+
+        log_info(os)("SetThreadGroupAffinity(%d, {Group %d, Mask 0x%08llx}, NULL)) with _created_thread_idx %d", thread_handle, group_index, groupInfo.ActiveProcessorMask, os::win32::_created_thread_idx);
+      }
+    } else if (ThreadGroupStrategy == 2) {
+      unsigned processors = 0;
+      unsigned group_index = os::win32::_created_thread_idx % processor_count();
+      for (unsigned i=0; i < groups; i++) {
+        PROCESSOR_GROUP_INFO groupInfo = os::win32::_pSytemLogicalProcessorInfo->Group.GroupInfo[i];
+        unsigned temp = processors + groupInfo.ActiveProcessorCount;
+        if (temp > group_index) {
+          // set affinity to group i
+          GROUP_AFFINITY groupAffinity {}; // Why {}?
+          groupAffinity.Mask = groupInfo.ActiveProcessorMask;
+          groupAffinity.Group = i;
+          if (!SetThreadGroupAffinity(thread_handle, &groupAffinity, NULL)) {
+            log_error(os)("SetThreadGroupAffinity() failed: GetLastError->%ld", GetLastError());
+          } else {
+            if (!os::win32::_logged_custom_thread_affinity) {
+              log_info(os)("Thread group affinity manually set. Detected %lu groups.", groups);
+              os::win32::_logged_custom_thread_affinity = true;
+            }
+
+            log_info(os)("SetThreadGroupAffinity(%d, {Group %d, Mask 0x%08llx}, NULL)) with _created_thread_idx %d", thread_handle, i, groupInfo.ActiveProcessorMask, os::win32::_created_thread_idx);
+            break;
+          }
+        } else {
+          processors = temp;
+        }
+      }
+    } else {
+        if (!os::win32::_logged_custom_thread_affinity) {
+          log_error(os)("Ignoring request to manually set thread group affinity. Unknown strategy.");
+          os::win32::_logged_custom_thread_affinity = true;
+        }
+    }
+  }
 
   // Thread state now is INITIALIZED, not SUSPENDED
   osthread->set_state(INITIALIZED);
@@ -859,6 +919,16 @@ bool os::has_allocatable_memory_limit(size_t* limit) {
 }
 
 int os::active_processor_count() {
+  // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getprocessaffinitymask
+  DWORD_PTR processAffinityMask;
+  DWORD_PTR systemAffinityMask;
+  if (!GetProcessAffinityMask(GetCurrentProcess(), &processAffinityMask, &systemAffinityMask)) {
+      log_error(os)("(active_processor_count) GetProcessAffinityMask failed: GetLastError->%ld", GetLastError());
+  }
+
+  log_info(os)("(active_processor_count) Process Affinity Mask: 0x%08llx\n"
+               "(active_processor_count) System  Affinity Mask: 0x%08llx\n", processAffinityMask, systemAffinityMask);
+
   // User has overridden the number of active processors
   if (ActiveProcessorCount > 0) {
     log_trace(os)("active_processor_count: "
@@ -3987,6 +4057,12 @@ int    os::win32::_major_version             = 0;
 int    os::win32::_minor_version             = 0;
 int    os::win32::_build_number              = 0;
 
+bool   os::win32::_handle_processor_groups   = false;
+int    os::win32::_created_thread_idx      = 0;
+int    os::win32::_processor_group_count   = 0;
+PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX os::win32::_pSytemLogicalProcessorInfo = NULL;
+bool   os::win32::_logged_custom_thread_affinity = false;
+
 void os::win32::compute_windows_version() {
   LPWSTR kernel32_path = NULL;
   LPWSTR version_info = NULL;
@@ -4058,7 +4134,7 @@ bool os::win32::schedules_all_processor_groups() {
   // to detect Windows 11 or Windows Server 2022. See
   // https://learn.microsoft.com/en-us/windows/win32/procthread/processor-groups#behavior-starting-with-windows-11-and-windows-server-2022
 
-  if (IsWindows10OrGreater()) {
+  if (_major_version >= 10) {
     if (IsWindowsServer()) {
       // Windows Server 2022 starts at build 20348.169 as per
       // https://learn.microsoft.com/en-us/windows/release-health/release-information
@@ -4093,34 +4169,34 @@ void os::win32::initialize_system_info() {
       GetModuleHandle(TEXT("kernel32")),
       "GetLogicalProcessorInformationEx");
 
-  if (glpiex != NULL && schedules_all_processor_groups()) {
+  if (glpiex != NULL) {
     LOGICAL_PROCESSOR_RELATIONSHIP relationshipType = RelationGroup;
-    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX pSytemLogicalProcessorInfo = NULL;
     DWORD returnedLength = 0;
 
     // https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getlogicalprocessorinformationex
-    if (!glpiex(relationshipType, pSytemLogicalProcessorInfo, &returnedLength)) {
+    if (!glpiex(relationshipType, _pSytemLogicalProcessorInfo, &returnedLength)) {
       DWORD lastError = GetLastError();
 
       if (lastError == ERROR_INSUFFICIENT_BUFFER) {
-        pSytemLogicalProcessorInfo = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)os::malloc(returnedLength, mtInternal);
+        _pSytemLogicalProcessorInfo = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)os::malloc(returnedLength, mtInternal);
 
-        if (NULL == pSytemLogicalProcessorInfo) {
+        if (NULL == _pSytemLogicalProcessorInfo) {
           warning("os::malloc() failed to allocate %ld bytes for GetLogicalProcessorInformationEx buffer", returnedLength);
-        } else if (!glpiex(relationshipType, pSytemLogicalProcessorInfo, &returnedLength)) {
+        } else if (!glpiex(relationshipType, _pSytemLogicalProcessorInfo, &returnedLength)) {
           warning("GetLogicalProcessorInformationEx() failed: GetLastError->%ld.", GetLastError());
         } else {
-          DWORD processorGroups = pSytemLogicalProcessorInfo->Group.ActiveGroupCount;
+          DWORD processorGroups = _pSytemLogicalProcessorInfo->Group.ActiveGroupCount;
+          set_processor_group_count(processorGroups);
 
           for (DWORD i = 0; i < processorGroups; i++) {
-            PROCESSOR_GROUP_INFO groupInfo = pSytemLogicalProcessorInfo->Group.GroupInfo[i];
+            PROCESSOR_GROUP_INFO groupInfo = _pSytemLogicalProcessorInfo->Group.GroupInfo[i];
             logicalProcessors += groupInfo.ActiveProcessorCount;
           }
 
           assert(logicalProcessors > 0, "Must find at least 1 logical processor");
         }
 
-        os::free(pSytemLogicalProcessorInfo);
+        // os::free(_pSytemLogicalProcessorInfo);
       }
       else {
         warning("GetLogicalProcessorInformationEx() failed: GetLastError->%ld.", lastError);
@@ -4128,7 +4204,13 @@ void os::win32::initialize_system_info() {
     }
   }
 
-  set_processor_count(logicalProcessors > 0 ? logicalProcessors : si.dwNumberOfProcessors);
+  if (logicalProcessors == 0) {
+    logicalProcessors = si.dwNumberOfProcessors;
+  } else if (logicalProcessors > 64 && !schedules_all_processor_groups()) {
+      _handle_processor_groups = true;
+  }
+
+  set_processor_count(logicalProcessors);
 
   MEMORYSTATUSEX ms;
   ms.dwLength = sizeof(ms);

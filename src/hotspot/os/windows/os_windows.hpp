@@ -48,6 +48,12 @@ class os::win32 {
   static int    _minor_version;
   static int    _build_number;
 
+  static bool   _handle_processor_groups;
+  static bool   _logged_custom_thread_affinity;
+  static int    _created_thread_idx;
+  static int    _processor_group_count;
+  static PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX _pSytemLogicalProcessorInfo;
+
   static void print_windows_version(outputStream* st);
   static void print_uptime_info(outputStream* st);
 
@@ -62,6 +68,10 @@ class os::win32 {
   static void   setmode_streams();
   static void   compute_windows_version();
   static bool   schedules_all_processor_groups();
+  static int processor_group_count() {
+    return _processor_group_count;
+  }
+  static void set_processor_group_count(int count) { _processor_group_count = count; }
 
   // Processor info as provided by NT
   static int processor_type()  { return _processor_type;  }
