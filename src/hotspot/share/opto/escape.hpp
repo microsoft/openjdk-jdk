@@ -591,7 +591,7 @@ private:
   // Methods related to Reduce Allocation Merges
 
   bool can_reduce_phi(PhiNode* ophi, Unique_Node_List &candidates) const;
-  bool can_reduce_phi_check_users(PhiNode* ophi, int nestedDepth=1) const;
+  bool can_reduce_phi_check_users(PhiNode* ophi, int nested_depth=1) const;
   bool can_reduce_phi_check_inputs(PhiNode* ophi, Unique_Node_List &candidates) const;
   
   void reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist);

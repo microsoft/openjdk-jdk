@@ -1564,8 +1564,8 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
     for(uint i = 1; i < base->req(); i++) {
        if (base->in(i)->is_Phi()) {
          parent_phi = base->in(i);
-         Node *memForLoadAfterOpt = MemNodeForNestedPhiLoadAfterOpt(phase, base, parent_phi);
-         if (!memForLoadAfterOpt || !get_region_to_split_through(parent_phi, memForLoadAfterOpt)) {
+         Node *mem_node_for_load_after_opt = get_mem_node_for_nested_phi_load_after_opt(phase, base, parent_phi);
+         if (!mem_node_for_load_after_opt || !get_region_to_split_through(parent_phi, mem_node_for_load_after_opt)) {
           return false;
          }
        }
@@ -1576,7 +1576,7 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
 
 // Pretend that optimization has happend on load fields and return the optimizaed load node 
 // return nullptr if optimization is impossible
-Node *LoadNode::MemNodeForNestedPhiLoadAfterOpt(PhaseGVN* phase, Node *basephi, Node* base_parentphi) {
+Node *LoadNode::get_mem_node_for_nested_phi_load_after_opt(PhaseGVN* phase, Node *basephi, Node* base_parentphi) {
   
   Node* mem        = in(Memory);
   Node *address    = in(Address);

@@ -472,25 +472,25 @@ bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi, Unique_Node_Lis
 
 // Check if we are able to untangle the merge. Right now we only reduce Phis
 // which are only used as debug information.
-bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi, int nestedDepth) const {
+bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi, int nested_depth) const {
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
 
-    if (use->is_SafePoint() && nestedDepth < 2) {
+    if (use->is_SafePoint() && nested_depth < 2) {
       if (use->is_Call() && use->as_Call()->has_non_debug_use(ophi)) {
         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. Call has non_debug_use().", ophi->_idx, _invocation);)
         return false;
       }
-    } else if (use->is_AddP() && nestedDepth <= 2) {
+    } else if (use->is_AddP() && nested_depth <= 2) {
       Node* addp = use;
       for (DUIterator_Fast jmax, j = addp->fast_outs(jmax); j < jmax; j++) {
         Node* use_use = addp->fast_out(j);
-        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn, (nestedDepth > 1))) {
+        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn, (nested_depth > 1))) {
          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", ophi->_idx, _invocation, use_use->Name());)
          return false;
         }
       }
-    } else if (nestedDepth > 1) {
+    } else if (nested_depth > 1) {
       // Note: Do not change the position of this else as all below cases are not eligible for nested optimizations
       return false;
     } else if (use->is_Phi()) {
@@ -498,7 +498,7 @@ bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi, int nestedDepth)
 	     NOT_PRODUCT(if (TraceReduceAllocationMerges)tty->print_cr("Can NOT reduce Self loop nested Phi");)
        return false;
       } else {
-	if (!can_reduce_phi_check_users(use->as_Phi(), nestedDepth+1)) {
+	if (!can_reduce_phi_check_users(use->as_Phi(), nested_depth+1)) {
  	 NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce nested Phi %d ", use->_idx);)
 	 return false;
 	} else {
