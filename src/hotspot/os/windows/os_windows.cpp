@@ -4156,7 +4156,12 @@ void os::win32::initialize_system_info() {
   _processor_type  = si.dwProcessorType;
   _processor_level = si.wProcessorLevel;
 
-  DWORD processors = system_logical_processor_count();
+  DWORD processors = 0;
+  bool schedules_all_processor_groups = win32::is_windows_11_or_greater() || win32::is_windows_server_2022_or_greater();
+  if (schedules_all_processor_groups) {
+    processors = system_logical_processor_count();
+  }
+
   set_processor_count(processors > 0 ? processors : si.dwNumberOfProcessors);
 
   MEMORYSTATUSEX ms;
