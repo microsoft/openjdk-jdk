@@ -4133,8 +4133,7 @@ DWORD os::win32::system_logical_processor_count() {
       }
 
       os::free(system_logical_processor_info);
-    }
-    else {
+    } else {
       warning("GetLogicalProcessorInformationEx() failed: GetLastError->%ld.", last_error);
     }
   }
