@@ -36,7 +36,7 @@
                          range,                                           \
                          constraint)                                      \
                                                                           \
-product(bool, UseAllProcessorGroups, false,                               \
+product(bool, UseAllWindowsProcessorGroups, false,                        \
         "Use all processor groups on supported Windows versions")         \
                                                                           \
 product(bool, UseOSErrorReporting, false,                                 \

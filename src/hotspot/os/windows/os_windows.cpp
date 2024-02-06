@@ -869,7 +869,7 @@ int os::active_processor_count() {
   }
 
   bool schedules_all_processor_groups = false;
-  if (UseAllProcessorGroups) {
+  if (UseAllWindowsProcessorGroups) {
     // Starting with Windows 11 and Windows Server 2022, the OS has changed to
     // make processes and their threads span all processors in the system,
     // across all processor groups, by default. Therefore, we will allow all
@@ -905,7 +905,7 @@ int os::active_processor_count() {
     warning("GetProcessAffinityMask() failed: GetLastError->%ld.", GetLastError());
   }
 
-  if (UseAllProcessorGroups) {
+  if (UseAllWindowsProcessorGroups) {
     // There are no processor affinity restrictions at this point so we can return
     // the overall processor count if the OS automatically schedules threads across
     // all processors on the system. Note that older operating systems can
