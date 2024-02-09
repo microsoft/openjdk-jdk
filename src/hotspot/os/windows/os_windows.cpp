@@ -4086,7 +4086,7 @@ DWORD os::win32::active_processors_in_job_object() {
               assert(false, "Unexpected group count");
             }
 
-            for (DWORD i = 0; i < group_count; i++) {
+            for (DWORD i = 0; i < groups_found; i++) {
               KAFFINITY group_affinity = ((GROUP_AFFINITY*)job_object_information)[i].Mask;
               processors += population_count(group_affinity);
             }
