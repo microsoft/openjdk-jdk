@@ -43,6 +43,7 @@ class os::win32 {
   static julong _physical_memory;
   static bool   _is_windows_server;
   static bool   _has_exit_bug;
+  static bool   _processor_group_warning_displayed;
 
   static int    _major_version;
   static int    _minor_version;
@@ -79,6 +80,13 @@ class os::win32 {
   static int windows_build_minor() {
     initialize_windows_version();
     return _build_minor;
+  }
+
+  static void set_processor_group_warning_displayed(bool displayed)  {
+    _processor_group_warning_displayed = displayed;
+  }
+  static bool processor_group_warning_displayed() {
+    return _processor_group_warning_displayed;
   }
 
   // Processor info as provided by NT

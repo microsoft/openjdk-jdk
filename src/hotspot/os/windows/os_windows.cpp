@@ -868,7 +868,7 @@ int os::active_processor_count() {
     return ActiveProcessorCount;
   }
 
-  bool schedules_all_processor_groups = false;
+  bool schedules_all_processor_groups = win32::is_windows_11_or_greater() || win32::is_windows_server_2022_or_greater();
   if (UseAllWindowsProcessorGroups) {
     // Starting with Windows 11 and Windows Server 2022, the OS has changed to
     // make processes and their threads span all processors in the system,
@@ -877,13 +877,15 @@ int os::active_processor_count() {
     // job objects can be used to restrict processor affinity across the
     // processor groups. In this case, the number of active processors must be
     // obtained from the processor affinity in the job object.
-    schedules_all_processor_groups = win32::is_windows_11_or_greater() || win32::is_windows_server_2022_or_greater();
     if (schedules_all_processor_groups) {
       DWORD processors_in_job_object = win32::active_processors_in_job_object();
 
       if (processors_in_job_object > 0) {
         return processors_in_job_object;
       }
+    } else if (!win32::processor_group_warning_displayed()) {
+      win32::set_processor_group_warning_displayed(true);
+      warning("The UseAllWindowsProcessorGroups flag is not supported on this Windows version and will be ignored.");
     }
   }
 
@@ -3993,6 +3995,8 @@ int    os::win32::_major_version             = 0;
 int    os::win32::_minor_version             = 0;
 int    os::win32::_build_number              = 0;
 int    os::win32::_build_minor               = 0;
+
+bool   os::win32::_processor_group_warning_displayed = false;
 
 void os::win32::initialize_windows_version() {
   if (_major_version > 0) {
