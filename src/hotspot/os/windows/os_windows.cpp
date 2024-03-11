@@ -886,6 +886,7 @@ int os::active_processor_count() {
     } else if (!win32::processor_group_warning_displayed()) {
       win32::set_processor_group_warning_displayed(true);
       warning("The UseAllWindowsProcessorGroups flag is not supported on this Windows version and will be ignored.");
+      FLAG_SET_DEFAULT(UseAllWindowsProcessorGroups, false);
     }
   }
 
