@@ -898,15 +898,23 @@ int os::active_processor_count() {
       // This will result in using only the subset of the processors in the default processor
       // group allowed by the job object i.e. only 1 processor group will be used and only
       // the processors in that group that are allowed by the job object will be used.
-      if (UseAllWindowsProcessorGroups) {
+      // This preserves the behavior where older OpenJDK versions always used one processor
+      // group regardless of whether they were launched in a job object.
+      if (!UseAllWindowsProcessorGroups && active_processor_groups > 1) {
+        if (!win32::job_object_processor_group_warning_displayed()) {
+          win32::set_job_object_processor_group_warning_displayed(true);
+          warning("The Windows job object has enabled multiple processor groups (%d) but the UseAllWindowsProcessorGroups flag is off. Some processors might not be used.", active_processor_groups);
+        }
+      } else {
         return processors_in_job_object;
       }
-    } else if (active_processor_groups > 1 && !win32::job_object_processor_group_warning_displayed()) {
-      win32::set_job_object_processor_group_warning_displayed(true);
-      warning("The Windows job object has enabled multiple processor groups (%d) but only 1 is suppported on this Windows version. Some processors may be unused", active_processor_groups);
+    } else {
+      if (active_processor_groups > 1 && !win32::job_object_processor_group_warning_displayed()) {
+        win32::set_job_object_processor_group_warning_displayed(true);
+        warning("The Windows job object has enabled multiple processor groups (%d) but only 1 is supported on this Windows version. Some processors might not be used.", active_processor_groups);
+      }
+      return processors_in_job_object;
     }
-
-    return processors_in_job_object;
   }
 
   DWORD logical_processors = 0;
