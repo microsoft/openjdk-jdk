@@ -4029,9 +4029,7 @@ bool   os::win32::_processor_group_warning_displayed = false;
 bool   os::win32::_job_object_processor_group_warning_displayed = false;
 
 void os::win32::initialize_windows_version() {
-  if (_major_version > 0) {
-    return; // nothing to do if the version has already been set
-  }
+  assert(_major_version == 0, "windows version already initialized.");
 
   VS_FIXEDFILEINFO *file_info;
   TCHAR kernel32_path[MAX_PATH];
@@ -4212,8 +4210,6 @@ DWORD os::win32::system_logical_processor_count() {
 }
 
 void os::win32::initialize_system_info() {
-  initialize_windows_version();
-
   SYSTEM_INFO si;
   GetSystemInfo(&si);
   OSInfo::set_vm_page_size(si.dwPageSize);
@@ -4536,6 +4532,7 @@ void nx_check_protection() {
 void os::init(void) {
   _initial_pid = _getpid();
 
+  win32::initialize_windows_version();
   win32::initialize_system_info();
   win32::setmode_streams();
   _page_sizes.add(os::vm_page_size());
