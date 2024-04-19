@@ -1292,6 +1292,16 @@ public class IRNode {
         beforeMatchingNameRegex(SAFEPOINT, "SafePoint");
     }
 
+    public static final String SAFEPOINT_SCALAR_MERGE = PREFIX + "SAFEPOINT_SCALAR_MERGE" + POSTFIX;
+    static {
+        beforeMatchingNameRegex(SAFEPOINT_SCALAR_MERGE, "SafePointScalarMerge");
+    }
+
+    public static final String SAFEPOINT_SCALAR_OBJECT = PREFIX + "SAFEPOINT_SCALAR_OBJECT" + POSTFIX;
+    static {
+    	beforeMatchingNameRegex(SAFEPOINT_SCALAR_OBJECT, "SafePointScalarObject");
+    }
+
     public static final String SCOPE_OBJECT = PREFIX + "SCOPE_OBJECT" + POSTFIX;
     static {
         String regex = "(.*# ScObj.*" + END;

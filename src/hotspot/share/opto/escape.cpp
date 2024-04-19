@@ -49,7 +49,7 @@ ConnectionGraph::ConnectionGraph(Compile * C, PhaseIterGVN *igvn, int invocation
   // pushed to the ConnectionGraph. The code below bumps the initial capacity of
   // _nodes by 10% to account for these additional nodes. If capacity is exceeded
   // the array will be reallocated.
-  _nodes(C->comp_arena(), C->do_reduce_allocation_merges() ? C->unique()*1.10 : C->unique(), C->unique(), nullptr),
+  _nodes(C->comp_arena(), ReduceAllocationMerges ? C->unique()*1.10 : C->unique(), C->unique(), nullptr),
   _in_worklist(C->comp_arena()),
   _next_pidx(0),
   _collecting(true),
@@ -360,7 +360,7 @@ bool ConnectionGraph::compute_escape() {
     dump(ptnodes_worklist); // Dump ConnectionGraph
   }
 #endif
-
+/*
 #ifdef ASSERT
   if (VerifyConnectionGraph) {
     int alloc_length = alloc_worklist.length();
@@ -383,7 +383,7 @@ bool ConnectionGraph::compute_escape() {
     }
   }
 #endif
-
+*/
   // 5. Separate memory graph for scalar replaceable allcations.
   bool has_scalar_replaceable_candidates = (alloc_worklist.length() > 0);
   if (has_scalar_replaceable_candidates && EliminateAllocations) {
@@ -411,7 +411,7 @@ bool ConnectionGraph::compute_escape() {
   }
 
   // 6. Remove reducible allocation merges from ideal graph
-  if (reducible_merges.size() > 0) {
+  if (ReduceAllocationMerges && reducible_merges.size() > 0) {
     bool delay = _igvn->delay_transform();
     _igvn->set_delay_transform(true);
     for (uint i = 0; i < reducible_merges.size(); i++ ) {
@@ -450,7 +450,7 @@ bool ConnectionGraph::compute_escape() {
 // Check if it's profitable to reduce the Phi passed as parameter.  Returns true
 // if at least one scalar replaceable allocation participates in the merge and
 // no input to the Phi is nullable.
-bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
+bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi, Unique_Node_List &candidates) const {
   // Check if there is a scalar replaceable allocate in the Phi
   bool found_sr_allocate = false;
 
@@ -473,39 +473,56 @@ bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
       } else {
         ptn->set_scalar_replaceable(false);
       }
-    }
+   } else if (ophi->in(i)->is_Phi()) {
+      if (candidates.member(ophi->in(i)) || ophi->_idx == ophi->in(i)->_idx || can_reduce_phi_check_inputs(ophi->in(i)->as_Phi(), candidates)) {
+	  found_sr_allocate = true;
+      }  
+   }								   
   }
-
   NOT_PRODUCT(if (TraceReduceAllocationMerges && !found_sr_allocate) tty->print_cr("Can NOT reduce Phi %d on invocation %d. No SR Allocate as input.", ophi->_idx, _invocation);)
   return found_sr_allocate;
 }
 
 // Check if we are able to untangle the merge. Right now we only reduce Phis
 // which are only used as debug information.
-bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi) const {
+bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi, int nested_depth) const {
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
 
-    if (use->is_SafePoint()) {
+    if (use->is_SafePoint() && nested_depth < 2) {
       if (use->is_Call() && use->as_Call()->has_non_debug_use(ophi)) {
         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. Call has non_debug_use().", ophi->_idx, _invocation);)
         return false;
       }
-    } else if (use->is_AddP()) {
+    } else if (use->is_AddP() && nested_depth <= 2) {
       Node* addp = use;
       for (DUIterator_Fast jmax, j = addp->fast_outs(jmax); j < jmax; j++) {
         Node* use_use = addp->fast_out(j);
-        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn)) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", ophi->_idx, _invocation, use_use->Name());)
-          return false;
+        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn, (nested_depth > 1))) {
+         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", ophi->_idx, _invocation, use_use->Name());)
+         return false;
         }
+      }
+    } else if (nested_depth > 1) {
+      // Note: Do not change the position of this else as all below cases are not eligible for nested optimizations
+      return false;
+    } else if (use->is_Phi()) {
+      if (ophi->_idx == use->_idx) {
+	     NOT_PRODUCT(if (TraceReduceAllocationMerges)tty->print_cr("Can NOT reduce Self loop nested Phi");)
+       return false;
+      } else {
+	if (!can_reduce_phi_check_users(use->as_Phi(), nested_depth+1)) {
+ 	 NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce nested Phi %d ", use->_idx);)
+	 return false;
+	} else {
+	    NOT_PRODUCT(if (TraceReduceAllocationMerges)  tty->print_cr("Can reduce nested Phi %d ", use->_idx);)
+	}
       }
     } else {
       NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. One of the uses is: %d %s", ophi->_idx, _invocation, use->_idx, use->Name());)
       return false;
     }
   }
-
   return true;
 }
 
@@ -513,11 +530,10 @@ bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi) const {
 // only used in some certain code shapes. Check comments in
 // 'can_reduce_phi_inputs' and 'can_reduce_phi_users' for more
 // details.
-bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
+bool ConnectionGraph::can_reduce_phi(PhiNode* ophi, Unique_Node_List &candidates) const {
   // If there was an error attempting to reduce allocation merges for this
-  // method we might have disabled the compilation and be retrying with RAM
-  // disabled.
-  // If EliminateAllocations is False, there is no point in reducing merges.
+  // method we might have disabled the compilation and be retrying
+  // with RAM disabled.
   if (!_compile->do_reduce_allocation_merges()) {
     return false;
   }
@@ -530,7 +546,7 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
     return false;
   }
 
-  if (!can_reduce_phi_check_inputs(ophi) || !can_reduce_phi_check_users(ophi)) {
+  if (!can_reduce_phi_check_inputs(ophi, candidates) || !can_reduce_phi_check_users(ophi)) {
     return false;
   }
 
@@ -542,7 +558,21 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
   // We'll pass this to 'split_through_phi' so that it'll do the split even
   // though the load doesn't have an unique instance type.
   bool ignore_missing_instance_id = true;
+  Unique_Node_List nested_phis;
+  // Collect nested phi nodes
+  for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
+    Node* use = ophi->fast_out(i);
+    if (use->is_Phi() && use->_idx != ophi->_idx)  {
+     nested_phis.push(use);
+    }
+  }
+  // make sure to process child phi nodes before parent phi nodes in nested phi scenario
+  for (uint i=0; i<nested_phis.size(); i++) {
+    Node *nested_phi = nested_phis.at(i);	  
+    reduce_phi_on_field_access(nested_phi->as_Phi(), alloc_worklist);
+  }
 
+/*
 #ifdef ASSERT
   if (VerifyReduceAllocationMerges && !can_reduce_phi(ophi)) {
     TraceReduceAllocationMerges = true;
@@ -551,7 +581,7 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
     assert(can_reduce_phi(ophi), "Sanity: previous reducible Phi is no longer reducible inside reduce_phi_on_field_access.");
   }
 #endif
-
+*/
   // Iterate over Phi outputs looking for an AddP
   for (int j = ophi->outcnt()-1; j >= 0;) {
     Node* previous_addp = ophi->raw_out(j);
@@ -578,14 +608,16 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
             if (new_load->is_Load()) {
               Node* new_addp = new_load->in(MemNode::Address);
               Node* base = get_addp_base(new_addp);
-
               // The base might not be something that we can create an unique
               // type for. If that's the case we are done with that input.
               PointsToNode* jobj_ptn = unique_java_object(base);
               if (jobj_ptn == nullptr || !jobj_ptn->scalar_replaceable()) {
+				        // Now let's add the node to the connection graph
+                _nodes.at_grow(new_addp->_idx, nullptr);
+                add_field(new_addp, fn->escape_state(), fn->offset());
+                add_base(ptnode_adr(new_addp->_idx)->as_Field(), ptnode_adr(base->_idx));					   
                 continue;
               }
-
               // Push to alloc_worklist since the base has an unique_type
               alloc_worklist.append_if_missing(new_addp);
 
@@ -752,12 +784,7 @@ void ConnectionGraph::reduce_phi(PhiNode* ophi) {
     if (use->is_SafePoint()) {
       safepoints.push(use->as_SafePoint());
     } else {
-#ifdef ASSERT
-      ophi->dump(-3);
-      assert(false, "Unexpected user of reducible Phi %d -> %d:%s", ophi->_idx, use->_idx, use->Name());
-#endif
-      _compile->record_failure(C2Compiler::retry_no_reduce_allocation_merges());
-      return;
+      assert(false, "Unexpected use of reducible Phi.");
     }
   }
 
@@ -767,9 +794,8 @@ void ConnectionGraph::reduce_phi(PhiNode* ophi) {
 }
 
 void ConnectionGraph::verify_ram_nodes(Compile* C, Node* root) {
-  if (!C->do_reduce_allocation_merges()) return;
-
   Unique_Node_List ideal_nodes;
+
   ideal_nodes.map(C->live_nodes(), nullptr);  // preallocate space
   ideal_nodes.push(root);
 
@@ -2336,7 +2362,7 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
           continue;
         }
 
-        if (use_n->is_Phi() && can_reduce_phi(use_n->as_Phi())) {
+        if (ReduceAllocationMerges && use_n->is_Phi() && can_reduce_phi(use_n->as_Phi(), candidates)) {
           candidates.push(use_n);
         } else {
           // Mark all objects as NSR if we can't remove the merge
