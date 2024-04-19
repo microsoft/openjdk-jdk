@@ -25,6 +25,8 @@
 
 package java.net;
 
+import jdk.internal.event.SocketReadEvent;
+import jdk.internal.event.SocketWriteEvent;
 import sun.security.util.SecurityConstants;
 
 import java.io.InputStream;
@@ -209,6 +211,7 @@ public class Socket implements java.io.Closeable {
      *
      * @since   1.5
      */
+    @SuppressWarnings("this-escape")
     public Socket(Proxy proxy) {
         // Create a copy of Proxy as a security measure
         if (proxy == null) {
@@ -317,6 +320,7 @@ public class Socket implements java.io.Closeable {
      * @see        java.net.SocketImpl
      * @see        SecurityManager#checkConnect
      */
+    @SuppressWarnings("this-escape")
     public Socket(String host, int port)
         throws UnknownHostException, IOException
     {
@@ -351,6 +355,7 @@ public class Socket implements java.io.Closeable {
      * @see        java.net.SocketImpl
      * @see        SecurityManager#checkConnect
      */
+    @SuppressWarnings("this-escape")
     public Socket(InetAddress address, int port) throws IOException {
         this(address != null ? new InetSocketAddress(address, port) : null,
              (SocketAddress) null, true);
@@ -392,6 +397,7 @@ public class Socket implements java.io.Closeable {
      * @see        SecurityManager#checkConnect
      * @since   1.1
      */
+    @SuppressWarnings("this-escape")
     public Socket(String host, int port, InetAddress localAddr,
                   int localPort) throws IOException {
         this(host != null ? new InetSocketAddress(host, port) :
@@ -434,6 +440,7 @@ public class Socket implements java.io.Closeable {
      * @see        SecurityManager#checkConnect
      * @since   1.1
      */
+    @SuppressWarnings("this-escape")
     public Socket(InetAddress address, int port, InetAddress localAddr,
                   int localPort) throws IOException {
         this(address != null ? new InetSocketAddress(address, port) : null,
@@ -481,6 +488,7 @@ public class Socket implements java.io.Closeable {
      * @deprecated Use DatagramSocket instead for UDP transport.
      */
     @Deprecated
+    @SuppressWarnings("this-escape")
     public Socket(String host, int port, boolean stream) throws IOException {
         this(host != null ? new InetSocketAddress(host, port) :
                new InetSocketAddress(InetAddress.getByName(null), port),
@@ -523,6 +531,7 @@ public class Socket implements java.io.Closeable {
      * @deprecated Use DatagramSocket instead for UDP transport.
      */
     @Deprecated
+    @SuppressWarnings("this-escape")
     public Socket(InetAddress host, int port, boolean stream) throws IOException {
         this(host != null ? new InetSocketAddress(host, port) : null,
              new InetSocketAddress(0), stream);
@@ -1073,9 +1082,6 @@ public class Socket implements java.io.Closeable {
     /**
      * An InputStream that delegates read/available operations to an underlying
      * input stream. The close method is overridden to close the Socket.
-     *
-     * This class is instrumented by Java Flight Recorder (JFR) to get socket
-     * I/O events.
      */
     private static class SocketInputStream extends InputStream {
         private final Socket parent;
@@ -1092,6 +1098,19 @@ public class Socket implements java.io.Closeable {
         }
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
+            if (!SocketReadEvent.enabled()) {
+                return implRead(b, off, len);
+            }
+            long start = SocketReadEvent.timestamp();
+            int nbytes = implRead(b, off, len);
+            long duration = SocketReadEvent.timestamp() - start;
+            if (SocketReadEvent.shouldCommit(duration)) {
+                SocketReadEvent.emit(start, duration, nbytes, parent.getRemoteSocketAddress(), getSoTimeout());
+            }
+            return nbytes;
+        }
+
+        private int implRead(byte[] b, int off, int len) throws IOException {
             try {
                 return in.read(b, off, len);
             } catch (SocketTimeoutException e) {
@@ -1105,6 +1124,16 @@ public class Socket implements java.io.Closeable {
                 throw e;
             }
         }
+
+        private int getSoTimeout() {
+            try {
+                return parent.getSoTimeout();
+            } catch (SocketException e) {
+                // ignored - avoiding exceptions in jfr event data gathering
+            }
+            return 0;
+        }
+
         @Override
         public int available() throws IOException {
             return in.available();
@@ -1169,9 +1198,6 @@ public class Socket implements java.io.Closeable {
     /**
      * An OutputStream that delegates write operations to an underlying output
      * stream. The close method is overridden to close the Socket.
-     *
-     * This class is instrumented by Java Flight Recorder (JFR) to get socket
-     * I/O events.
      */
     private static class SocketOutputStream extends OutputStream {
         private final Socket parent;
@@ -1187,6 +1213,19 @@ public class Socket implements java.io.Closeable {
         }
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
+            if (!SocketWriteEvent.enabled()) {
+                implWrite(b, off, len);
+                return;
+            }
+            long start = SocketWriteEvent.timestamp();
+            implWrite(b, off, len);
+            long duration = SocketWriteEvent.timestamp() - start;
+            if (SocketWriteEvent.shouldCommit(duration)) {
+                SocketWriteEvent.emit(start, duration, len, parent.getRemoteSocketAddress());
+            }
+        }
+
+        private void implWrite(byte[] b, int off, int len) throws IOException {
             try {
                 out.write(b, off, len);
             } catch (InterruptedIOException e) {

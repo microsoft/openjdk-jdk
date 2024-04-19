@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2011, 2023, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, 2024, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
 # This code is free software; you can redistribute it and/or modify it
@@ -108,12 +108,6 @@ AC_DEFUN([LIB_SETUP_JVM_LIBS],
       BASIC_JVM_LIBS_$1="$BASIC_JVM_LIBS_$1 -latomic"
     fi
   fi
-
-  # Because RISC-V only has word-sized atomics, it requires libatomic where
-  # other common architectures do not, so link libatomic by default.
-  if test "x$OPENJDK_$1_OS" = xlinux && test "x$OPENJDK_$1_CPU" = xriscv64; then
-    BASIC_JVM_LIBS_$1="$BASIC_JVM_LIBS_$1 -latomic"
-  fi
 ])
 
 ################################################################################
@@ -177,13 +171,11 @@ AC_DEFUN_ONCE([LIB_SETUP_LIBRARIES],
   LIB_SETUP_JVM_LIBS(TARGET)
 
   JDKLIB_LIBS="$BASIC_JDKLIB_LIBS"
-  JDKEXE_LIBS=""
   JVM_LIBS="$BASIC_JVM_LIBS $BASIC_JVM_LIBS_TARGET"
   OPENJDK_BUILD_JDKLIB_LIBS="$BASIC_JDKLIB_LIBS"
   OPENJDK_BUILD_JVM_LIBS="$BASIC_JVM_LIBS $BASIC_JVM_LIBS_BUILD"
 
   AC_SUBST(JDKLIB_LIBS)
-  AC_SUBST(JDKEXE_LIBS)
   AC_SUBST(JVM_LIBS)
   AC_SUBST(OPENJDK_BUILD_JDKLIB_LIBS)
   AC_SUBST(OPENJDK_BUILD_JVM_LIBS)

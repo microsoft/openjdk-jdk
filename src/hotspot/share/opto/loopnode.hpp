@@ -42,8 +42,9 @@ class OuterStripMinedLoopEndNode;
 class PredicateBlock;
 class PathFrequency;
 class PhaseIdealLoop;
-class CountedLoopReserveKit;
+class UnswitchedLoopSelector;
 class VectorSet;
+class VSharedData;
 class Invariance;
 struct small_cache;
 
@@ -232,14 +233,11 @@ class CountedLoopNode : public BaseCountedLoopNode {
   // vector mapped unroll factor here
   int _slp_maximum_unroll_factor;
 
-  // Cached CountedLoopEndNode of pre loop for main loops
-  CountedLoopEndNode* _pre_loop_end;
-
 public:
   CountedLoopNode(Node *entry, Node *backedge)
     : BaseCountedLoopNode(entry, backedge), _main_idx(0), _trip_count(max_juint),
       _unrolled_count_log2(0), _node_count_before_unroll(0),
-      _slp_maximum_unroll_factor(0), _pre_loop_end(nullptr) {
+      _slp_maximum_unroll_factor(0) {
     init_class_id(Class_CountedLoop);
     // Initialize _trip_count to the largest possible value.
     // Will be reset (lower) if the loop's trip count is known.
@@ -331,9 +329,6 @@ public:
 
   Node* is_canonical_loop_entry();
   CountedLoopEndNode* find_pre_loop_end();
-  CountedLoopNode* pre_loop_head() const;
-  CountedLoopEndNode* pre_loop_end();
-  void set_pre_loop_end(CountedLoopEndNode* pre_loop_end);
 
 #ifndef PRODUCT
   virtual void dump_spec(outputStream *st) const;
@@ -776,6 +771,12 @@ public:
     return _has_range_checks;
   }
 
+  // Return the parent's IdealLoopTree for a strip mined loop which is the outer strip mined loop.
+  // In all other cases, return this.
+  IdealLoopTree* skip_strip_mined() {
+    return _head->as_Loop()->is_strip_mined() ? _parent : this;
+  }
+
 #ifndef PRODUCT
   void dump_head();       // Dump loop head only
   void dump();            // Dump this loop recursively
@@ -818,7 +819,6 @@ public:
 class PhaseIdealLoop : public PhaseTransform {
   friend class IdealLoopTree;
   friend class SuperWord;
-  friend class CountedLoopReserveKit;
   friend class ShenandoahBarrierC2Support;
   friend class AutoNodeBudget;
 
@@ -1105,6 +1105,7 @@ private:
   // Compute the Ideal Node to Loop mapping
   PhaseIdealLoop(PhaseIterGVN& igvn, LoopOptsMode mode) :
     PhaseTransform(Ideal_Loop),
+    _loop_or_ctrl(igvn.C->comp_arena()),
     _igvn(igvn),
     _verify_me(nullptr),
     _verify_only(false),
@@ -1119,6 +1120,7 @@ private:
   // or only verify that the graph is valid if verify_me is null.
   PhaseIdealLoop(PhaseIterGVN& igvn, const PhaseIdealLoop* verify_me = nullptr) :
     PhaseTransform(Ideal_Loop),
+    _loop_or_ctrl(igvn.C->comp_arena()),
     _igvn(igvn),
     _verify_me(verify_me),
     _verify_only(verify_me == nullptr),
@@ -1196,7 +1198,7 @@ public:
     if (!C->failing()) {
       // Cleanup any modified bits
       igvn.optimize();
-
+      if (C->failing()) { return; }
       v.log_loop_tree();
     }
   }
@@ -1341,16 +1343,21 @@ public:
 
  private:
   // Helper functions for create_new_if_for_predicate()
-  void set_ctrl_of_nodes_with_same_ctrl(Node* node, ProjNode* old_ctrl, Node* new_ctrl);
+  void set_ctrl_of_nodes_with_same_ctrl(Node* start_node, ProjNode* old_uncommon_proj, Node* new_uncommon_proj);
   Unique_Node_List find_nodes_with_same_ctrl(Node* node, const ProjNode* ctrl);
-  Node* clone_nodes_with_same_ctrl(Node* node, ProjNode* old_ctrl, Node* new_ctrl);
-  Dict clone_nodes(const Node_List& list_to_clone);
-  void rewire_cloned_nodes_to_ctrl(const ProjNode* old_ctrl, Node* new_ctrl, const Node_List& nodes_with_same_ctrl,
-                                   const Dict& old_new_mapping);
-  void rewire_inputs_of_clones_to_clones(Node* new_ctrl, Node* clone, const Dict& old_new_mapping, const Node* next);
+  Node* clone_nodes_with_same_ctrl(Node* start_node, ProjNode* old_uncommon_proj, Node* new_uncommon_proj);
+  void fix_cloned_data_node_controls(const ProjNode* orig, Node* new_uncommon_proj,
+                                     const OrigToNewHashtable& orig_to_clone);
+  bool has_dominating_loop_limit_check(Node* init_trip, Node* limit, jlong stride_con, BasicType iv_bt,
+                                       Node* loop_entry);
 
  public:
   void register_control(Node* n, IdealLoopTree *loop, Node* pred, bool update_body = true);
+
+  void replace_loop_entry(LoopNode* loop_head, Node* new_entry) {
+    _igvn.replace_input_of(loop_head, LoopNode::EntryControl, new_entry);
+    set_idom(loop_head, new_entry, dom_depth(new_entry));
+  }
 
   // Construct a range check for a predicate if
   BoolNode* rc_predicate(IdealLoopTree* loop, Node* ctrl, int scale, Node* offset, Node* init, Node* limit,
@@ -1391,8 +1398,6 @@ public:
 
   void eliminate_useless_zero_trip_guard();
 
-  bool has_control_dependencies_from_predicates(LoopNode* head) const;
-  void verify_fast_loop(LoopNode* head, const ProjNode* proj_true) const NOT_DEBUG_RETURN;
  public:
   // Change the control input of expensive nodes to allow commoning by
   // IGVN when it is guaranteed to not result in a more frequent
@@ -1407,31 +1412,30 @@ public:
   // Eliminate range-checks and other trip-counter vs loop-invariant tests.
   void do_range_check(IdealLoopTree *loop, Node_List &old_new);
 
-  // Create a slow version of the loop by cloning the loop
-  // and inserting an if to select fast-slow versions.
-  // Return the inserted if.
-  IfNode* create_slow_version_of_loop(IdealLoopTree *loop,
-                                        Node_List &old_new,
-                                        IfNode* unswitch_iff,
-                                        CloneLoopMode mode);
-
-  // Clone a loop and return the clone head (clone_loop_head).
-  // Added nodes include int(1), int(0) - disconnected, If, IfTrue, IfFalse,
-  // This routine was created for usage in CountedLoopReserveKit.
-  //
-  //    int(1) -> If -> IfTrue -> original_loop_head
-  //              |
-  //              V
-  //           IfFalse -> clone_loop_head (returned by function pointer)
-  //
-  LoopNode* create_reserve_version_of_loop(IdealLoopTree *loop, CountedLoopReserveKit* lk);
   // Clone loop with an invariant test (that does not exit) and
   // insert a clone of the test that selects which version to
   // execute.
-  void do_unswitching (IdealLoopTree *loop, Node_List &old_new);
+  void do_unswitching(IdealLoopTree* loop, Node_List& old_new);
 
-  // Find candidate "if" for unswitching
-  IfNode* find_unswitching_candidate(const IdealLoopTree *loop) const;
+  IfNode* find_unswitch_candidate(const IdealLoopTree* loop) const;
+
+ private:
+  static bool has_control_dependencies_from_predicates(LoopNode* head);
+  static void revert_to_normal_loop(const LoopNode* loop_head);
+
+  void hoist_invariant_check_casts(const IdealLoopTree* loop, const Node_List& old_new,
+                                   const UnswitchedLoopSelector& unswitched_loop_selector);
+  void add_unswitched_loop_version_bodies_to_igvn(IdealLoopTree* loop, const Node_List& old_new);
+  static void increment_unswitch_counts(LoopNode* original_head, LoopNode* new_head);
+  void remove_unswitch_candidate_from_loops(const Node_List& old_new, const UnswitchedLoopSelector& unswitched_loop_selector);
+#ifndef PRODUCT
+  static void trace_loop_unswitching_count(IdealLoopTree* loop, LoopNode* original_head);
+  static void trace_loop_unswitching_impossible(const LoopNode* original_head);
+  static void trace_loop_unswitching_result(const UnswitchedLoopSelector& unswitched_loop_selector,
+                                            const LoopNode* original_head, const LoopNode* new_head);
+#endif
+
+ public:
 
   // Range Check Elimination uses this function!
   // Constrain the main loop iterations so the affine function:
@@ -1446,6 +1450,14 @@ public:
   // Partially peel loop up through last_peel node.
   bool partial_peel( IdealLoopTree *loop, Node_List &old_new );
   bool duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old_new);
+
+  // AutoVectorize the loop: replace scalar ops with vector ops.
+  enum AutoVectorizeStatus {
+    Impossible,      // This loop has the wrong shape to even try vectorization.
+    Success,         // We just successfully vectorized the loop.
+    TriedAndFailed,  // We tried to vectorize, but failed.
+  };
+  AutoVectorizeStatus auto_vectorize(IdealLoopTree* lpt, VSharedData &vshared);
 
   // Move UnorderedReduction out of loop if possible
   void move_unordered_reduction_out_of_loop(IdealLoopTree* loop);
@@ -1519,7 +1531,7 @@ public:
   Node *has_local_phi_input( Node *n );
   // Mark an IfNode as being dominated by a prior test,
   // without actually altering the CFG (and hence IDOM info).
-  void dominated_by(IfProjNode* prevdom, IfNode* iff, bool flip = false, bool exclude_loop_predicate = false);
+  void dominated_by(IfProjNode* prevdom, IfNode* iff, bool flip = false, bool pin_array_access_nodes = false);
 
   // Split Node 'n' through merge point
   RegionNode* split_thru_region(Node* n, RegionNode* region);
@@ -1547,7 +1559,7 @@ private:
   Node *find_use_block( Node *use, Node *def, Node *old_false, Node *new_false, Node *old_true, Node *new_true );
   void handle_use( Node *use, Node *def, small_cache *cache, Node *region_dom, Node *new_false, Node *new_true, Node *old_false, Node *old_true );
   bool split_up( Node *n, Node *blk1, Node *blk2 );
-  void sink_use( Node *use, Node *post_loop );
+
   Node* place_outside_loop(Node* useblock, IdealLoopTree* loop) const;
   Node* try_move_store_before_loop(Node* n, Node *n_ctrl);
   void try_move_store_after_loop(Node* n);
@@ -1630,9 +1642,11 @@ private:
     _nodes_required = UINT_MAX;
   }
 
+ public:
   // Clone Parse Predicates to slow and fast loop when unswitching a loop
   void clone_parse_and_assertion_predicates_to_unswitched_loop(IdealLoopTree* loop, Node_List& old_new,
                                                                IfProjNode*& iffast_pred, IfProjNode*& ifslow_pred);
+ private:
   void clone_loop_predication_predicates_to_unswitched_loop(IdealLoopTree* loop, const Node_List& old_new,
                                                             const PredicateBlock* predicate_block,
                                                             Deoptimization::DeoptReason reason, IfProjNode*& iffast_pred,
@@ -1747,6 +1761,10 @@ public:
   Node* similar_subtype_check(const Node* x, Node* r_in);
 
   void update_addp_chain_base(Node* x, Node* old_base, Node* new_base);
+
+  bool can_move_to_inner_loop(Node* n, LoopNode* n_loop, Node* x);
+
+  void pin_array_access_nodes_dependent_on(Node* ctrl);
 };
 
 
@@ -1793,69 +1811,6 @@ private:
   bool _check_at_final;
   uint _nodes_at_begin;
 };
-
-
-// This kit may be used for making of a reserved copy of a loop before this loop
-//  goes under non-reversible changes.
-//
-// Function create_reserve() creates a reserved copy (clone) of the loop.
-// The reserved copy is created by calling
-// PhaseIdealLoop::create_reserve_version_of_loop - see there how
-// the original and reserved loops are connected in the outer graph.
-// If create_reserve succeeded, it returns 'true' and _has_reserved is set to 'true'.
-//
-// By default the reserved copy (clone) of the loop is created as dead code - it is
-// dominated in the outer loop by this node chain:
-//   intcon(1)->If->IfFalse->reserved_copy.
-// The original loop is dominated by the same node chain but IfTrue projection:
-//   intcon(0)->If->IfTrue->original_loop.
-//
-// In this implementation of CountedLoopReserveKit the ctor includes create_reserve()
-// and the dtor, checks _use_new value.
-// If _use_new == false, it "switches" control to reserved copy of the loop
-// by simple replacing of node intcon(1) with node intcon(0).
-//
-// Here is a proposed example of usage (see also SuperWord::output in superword.cpp).
-//
-// void CountedLoopReserveKit_example()
-// {
-//    CountedLoopReserveKit lrk((phase, lpt, DoReserveCopy = true); // create local object
-//    if (DoReserveCopy && !lrk.has_reserved()) {
-//      return; //failed to create reserved loop copy
-//    }
-//    ...
-//    //something is wrong, switch to original loop
-///   if(something_is_wrong) return; // ~CountedLoopReserveKit makes the switch
-//    ...
-//    //everything worked ok, return with the newly modified loop
-//    lrk.use_new();
-//    return; // ~CountedLoopReserveKit does nothing once use_new() was called
-//  }
-//
-// Keep in mind, that by default if create_reserve() is not followed by use_new()
-// the dtor will "switch to the original" loop.
-// NOTE. You you modify outside of the original loop this class is no help.
-//
-class CountedLoopReserveKit {
-  private:
-    PhaseIdealLoop* _phase;
-    IdealLoopTree*  _lpt;
-    LoopNode*       _lp;
-    IfNode*         _iff;
-    LoopNode*       _lp_reserved;
-    bool            _has_reserved;
-    bool            _use_new;
-    const bool      _active; //may be set to false in ctor, then the object is dummy
-
-  public:
-    CountedLoopReserveKit(PhaseIdealLoop* phase, IdealLoopTree *loop, bool active);
-    ~CountedLoopReserveKit();
-    void use_new()                {_use_new = true;}
-    void set_iff(IfNode* x)       {_iff = x;}
-    bool has_reserved()     const { return _active && _has_reserved;}
-  private:
-    bool create_reserve();
-};// class CountedLoopReserveKit
 
 inline Node* IdealLoopTree::tail() {
   // Handle lazy update of _tail field.
@@ -1925,4 +1880,42 @@ public:
   float to(Node* n);
 };
 
+// Class to clone a data node graph by taking a list of data nodes. This is done in 2 steps:
+//   1. Clone the data nodes
+//   2. Fix the cloned data inputs pointing to the old nodes to the cloned inputs by using an old->new mapping.
+class DataNodeGraph : public StackObj {
+  PhaseIdealLoop* const _phase;
+  const Unique_Node_List& _data_nodes;
+  OrigToNewHashtable _orig_to_new;
+
+ public:
+  DataNodeGraph(const Unique_Node_List& data_nodes, PhaseIdealLoop* phase)
+      : _phase(phase),
+        _data_nodes(data_nodes),
+        // Use 107 as best guess which is the first resize value in ResizeableResourceHashtable::large_table_sizes.
+        _orig_to_new(107, MaxNodeLimit)
+  {
+#ifdef ASSERT
+    for (uint i = 0; i < data_nodes.size(); i++) {
+      assert(!data_nodes[i]->is_CFG(), "only data nodes");
+    }
+#endif
+  }
+  NONCOPYABLE(DataNodeGraph);
+
+ private:
+  void clone(Node* node, Node* new_ctrl);
+  void clone_data_nodes(Node* new_ctrl);
+  void rewire_clones_to_cloned_inputs();
+
+ public:
+  // Clone the provided data node collection and rewire the clones in such a way to create an identical graph copy.
+  // Set 'new_ctrl' as ctrl for the cloned nodes.
+  const OrigToNewHashtable& clone(Node* new_ctrl) {
+    assert(_orig_to_new.number_of_entries() == 0, "should not call this method twice in a row");
+    clone_data_nodes(new_ctrl);
+    rewire_clones_to_cloned_inputs();
+    return _orig_to_new;
+  }
+};
 #endif // SHARE_OPTO_LOOPNODE_HPP

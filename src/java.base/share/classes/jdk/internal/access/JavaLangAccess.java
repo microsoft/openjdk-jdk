@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,6 +27,7 @@ package jdk.internal.access;
 
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
+import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.lang.module.ModuleDescriptor;
@@ -45,7 +46,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.stream.Stream;
 
-import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.CarrierThreadLocal;
 import jdk.internal.module.ServicesCatalog;
 import jdk.internal.reflect.ConstantPool;
@@ -64,6 +64,11 @@ public interface JavaLangAccess {
      * and parameter types.
      */
     List<Method> getDeclaredPublicMethods(Class<?> klass, String name, Class<?>... parameterTypes);
+
+    /**
+     * Return most specific method that matches name and parameterTypes.
+     */
+    Method findMethod(Class<?> klass, boolean publicOnly, String name, Class<?>... parameterTypes);
 
     /**
      * Return the constant pool for a class.
@@ -265,6 +270,12 @@ public interface JavaLangAccess {
     Module addEnableNativeAccess(Module m);
 
     /**
+     * Updates module named {@code name} in layer {@code layer} to allow access to restricted methods.
+     * Returns true iff the given module exists in the given layer.
+     */
+    boolean addEnableNativeAccess(ModuleLayer layer, String name);
+
+    /**
      * Updates all unnamed modules to allow access to restricted methods.
      */
     void addEnableNativeAccessToAllUnnamed();
@@ -273,7 +284,7 @@ public interface JavaLangAccess {
      * Ensure that the given module has native access. If not, warn or
      * throw exception depending on the configuration.
      */
-    void ensureNativeAccess(Module m, Class<?> owner, String methodName);
+    void ensureNativeAccess(Module m, Class<?> owner, String methodName, Class<?> currentClass);
 
     /**
      * Returns the ServicesCatalog for the given Layer.
@@ -419,19 +430,16 @@ public interface JavaLangAccess {
    /**
     * Get the coder for the supplied character.
     */
-   @PreviewFeature(feature=PreviewFeature.Feature.STRING_TEMPLATES)
    long stringConcatCoder(char value);
 
    /**
     * Update lengthCoder for StringBuilder.
     */
-   @PreviewFeature(feature=PreviewFeature.Feature.STRING_TEMPLATES)
    long stringBuilderConcatMix(long lengthCoder, StringBuilder sb);
 
     /**
      * Prepend StringBuilder content.
-     */
-    @PreviewFeature(feature=PreviewFeature.Feature.STRING_TEMPLATES)
+    */
    long stringBuilderConcatPrepend(long lengthCoder, byte[] buf, StringBuilder sb);
 
     /**
@@ -574,4 +582,20 @@ public interface JavaLangAccess {
      * explicitly set otherwise <qualified-class-name> @<id>
      */
     String getLoaderNameID(ClassLoader loader);
+
+    /**
+     * Copy the string bytes to an existing segment, avoiding intermediate copies.
+     */
+    void copyToSegmentRaw(String string, MemorySegment segment, long offset);
+
+    /**
+     * Are the string bytes compatible with the given charset?
+     */
+    boolean bytesCompatible(String string, Charset charset);
+
+    /**
+     * Is a security manager already set or allowed to be set
+     * (using -Djava.security.manager=allow)?
+     */
+    boolean allowSecurityManager();
 }
