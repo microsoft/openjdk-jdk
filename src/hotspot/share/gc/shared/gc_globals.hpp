@@ -127,7 +127,7 @@
   product(ccstr, ErgonomicsProfile, "auto",                                 \
           "Ergonomics profile to use. "                                     \
           "\"auto\" by default. "                                           \
-          "\"shared\" for traditional environments and \"dedicated\" for    \
+          "\"shared\" for traditional environments and \"dedicated\" for"   \
           "environments with dedicated resources for the JVM")              \
                                                                             \
   /* notice: the max range value here is INT_MAX not UINT_MAX  */           \
