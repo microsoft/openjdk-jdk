@@ -1479,10 +1479,14 @@ jint Arguments::set_ergonomics_flags() {
 void Arguments::set_ergonomics_profile() {
   validate_ergonomics_profile();
 
+  // Uncomment the following code to enable this feature once it has been validated by the OpenJDK community
+  // Set default ergonomics profile based on containerization
   if (FLAG_IS_DEFAULT(ErgonomicsProfile)){
 #ifdef LINUX
     if (OSContainer::is_containerized()){
       FLAG_SET_ERGO(ErgonomicsProfile, "dedicated");
+    } else {
+      FLAG_SET_ERGO(ErgonomicsProfile, "shared");
     }
 #endif //LINUX
   }
