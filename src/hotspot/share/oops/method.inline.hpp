@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -39,14 +39,7 @@ inline address Method::from_interpreted_entry() const {
   return Atomic::load_acquire(&_from_interpreted_entry);
 }
 
-inline void Method::set_method_data(MethodData* data) {
-  // The store into method must be released. On platforms without
-  // total store order (TSO) the reference may become visible before
-  // the initialization of data otherwise.
-  Atomic::release_store(&_method_data, data);
-}
-
-inline CompiledMethod* Method::code() const {
+inline nmethod* Method::code() const {
   assert( check_code(), "" );
   return Atomic::load_acquire(&_code);
 }

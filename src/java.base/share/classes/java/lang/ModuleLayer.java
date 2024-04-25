@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -305,12 +305,6 @@ public final class ModuleLayer {
          * Enables native access for a module in the layer if the caller's module
          * has native access.
          *
-         * <p> This method is <a href="foreign/package-summary.html#restricted"><em>restricted</em></a>.
-         * Restricted methods are unsafe, and, if used incorrectly, their use might crash
-         * the JVM or, worse, silently result in memory corruption. Thus, clients should refrain
-         * from depending on restricted methods, and use safe and supported functionalities,
-         * where possible.
-         *
          * @param  target
          *         The module to update
          *
@@ -322,9 +316,8 @@ public final class ModuleLayer {
          * @throws IllegalCallerException
          *         If the caller is in a module that does not have native access enabled
          *
-         * @since 20
+         * @since 22
          */
-        @PreviewFeature(feature=PreviewFeature.Feature.FOREIGN)
         @CallerSensitive
         @Restricted
         public Controller enableNativeAccess(Module target) {
@@ -888,6 +881,24 @@ public final class ModuleLayer {
                 .findAny();
     }
 
+    /**
+     * Updates the module with the given {@code name} in this layer
+     * to allow access to restricted methods.
+     *
+     * @param name the name of the module for which the native access
+     *             should be enabled
+     * @return {@code true} iff the module is present in this layer,
+     *         {@code false} otherwise
+     */
+    boolean addEnableNativeAccess(String name) {
+        Module m = nameToModule.get(name);
+        if (m != null) {
+            m.implAddEnableNativeAccess();
+            return true;
+        } else {
+            return false;
+        }
+    }
 
     /**
      * Returns the {@code ClassLoader} for the module with the given name. If
