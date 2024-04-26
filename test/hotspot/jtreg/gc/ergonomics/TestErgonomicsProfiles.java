@@ -36,60 +36,104 @@ package gc.ergonomics;
 
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
+
+import jdk.test.lib.containers.docker.Common;
+import jdk.test.lib.containers.docker.DockerRunOptions;
+import jdk.test.lib.containers.docker.DockerTestUtils;
+
+import jdk.test.lib.Platform;
+import jdk.test.lib.Utils;
+
 import jtreg.SkippedException;
 import jdk.test.whitebox.gc.GC;
 
+/*
+ * @test TestErgonomicsProfiles
+ * @summary Ensure that ErgonomicsProfile fails with unsupported profile
+ * @requires docker.support
+ * @modules java.base/jdk.internal.misc
+ *          java.management
+ * @library /test/lib
+ * @build jdk.test.whitebox.WhiteBox
+ * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
+ * @run main/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI gc.ergonomics.TestErgonomicsProfiles
+ */
 public class TestErgonomicsProfiles {
 
   public static void main(String[] args) throws Exception {  
-    
-    testErgonomicProfile("shared", "shared");
-    
-    testErgonomicProfile("dedicated", "dedicated");
+    testInvalidProfile();
 
-    //testInsideContainer("auto", "shared");
+    // Test manual selection
+    testErgonomicProfile("dedicated", "dedicated");
+    testErgonomicProfile("shared", "shared");
+    testDefaultErgonomicProfile("shared"); // default profile is shared. Change if default changes.
+
+    // Test automatic selection and default, inside container
+    testInsideContainer("auto", "shared"); // default profile is shared even inside containers. Change if default changes.
+
+    // TODO: test GC selection and Heap Size
   }
 
-  private static void verifyErgonomicProfile(OutputAnalyzer output, String expectedProfile) {
-    output.shouldHaveExitValue(0); // test should run succesfully
-    output.shouldContain(expectedProfile);
+  private static void testInvalidProfile() throws Exception {
+    String[] baseArgs = {"-XX:ErgonomicsProfile=invalid", "-XX:+PrintFlagsFinal", "-version"};
+
+    // Base test with invalid ergonomics profile
+    OutputAnalyzer output = ProcessTools.executeLimitedTestJava(baseArgs);
+    output
+      .shouldHaveExitValue(1)
+      .stderrContains("Unsupported ErgonomicsProfile: invalid");
+  }
+
+  private static void testDefaultErgonomicProfile(String expectedProfile) throws Exception {
+    String[] baseArgs = {"-XX:+PrintFlagsFinal", "-version"};
+
+    // Base test with default ergonomics profile
+    ProcessTools.executeLimitedTestJava(baseArgs)
+      .shouldHaveExitValue(0)
+      .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
   }
 
   private static void testErgonomicProfile(String ergonomicsProfile, String expectedProfile) throws Exception {
-    String[] baseArgs = {"-XX:ErgonomicsProfile=" + ergonomicsProfile};
+    String[] baseArgs = {"-XX:ErgonomicsProfile=" + ergonomicsProfile, "-XX:+PrintFlagsFinal", "-version"};
 
     // Base test with selected ergonomics profile
-    OutputAnalyzer output = ProcessTools.executeLimitedTestJava(baseArgs);
-    verifyErgonomicProfile(output, expectedProfile);
+    ProcessTools.executeLimitedTestJava(baseArgs)
+      .shouldHaveExitValue(0)
+      .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
   }
 
   private static void testInsideContainer(String ergonomicsProfile, String expectedProfile) throws Exception {
+    String[] javaOpts = {"-XX:ErgonomicsProfile=" + ergonomicsProfile, "-XX:+PrintFlagsFinal"};
+
     if (!DockerTestUtils.canTestDocker()) {
+      System.out.println("Docker not available, skipping test");
       return;
     }
 
-    final String imageNameAndTag = Common.imageName("basic");
+    final String imageNameAndTag = "ergoimage";
 
-    DockerTestUtils.buildJdkContainerImage(imageNameAndTag);
+    String dockerfile =
+      "FROM --platform=linux/amd64 ubuntu:latest\n" +
+      "COPY /jdk /jdk\n" +
+      "ENV JAVA_HOME=/jdk\n" +
+      "CMD [\"/bin/bash\"]\n";
+
+    DockerTestUtils.buildJdkContainerImage(imageNameAndTag, dockerfile);
 
     try {
         DockerRunOptions opts =
-            new ∏(imageNameAndTag, "/jdk/bin/java", "-version");
+            new DockerRunOptions(imageNameAndTag, "/jdk/bin/java", "-version", javaOpts);
+        opts.addDockerOpts("--platform=linux/amd64");
 
         DockerTestUtils.dockerRunJava(opts)
             .shouldHaveExitValue(0)
-            .shouldContain(Platform.vmName);
+            .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
     
     } finally {
         if (!DockerTestUtils.RETAIN_IMAGE_AFTER_TEST) {
             DockerTestUtils.removeDockerImage(imageNameAndTag);
         }
     }
-
-    // Base test with default ergonomics profile
-    OutputAnalyzer output = ProcessTools.executeLimitedTestJava(baseArgs);
-    verifyErgonomicProfile(output, expectedProfile);
   }
-
 
 }
