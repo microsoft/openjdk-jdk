@@ -124,11 +124,12 @@
   product(bool, UseShenandoahGC, false,                                     \
           "Use the Shenandoah garbage collector")                           \
                                                                             \
-  product(ccstr, ErgonomicsProfile, "auto",                                 \
+  /* notice: once stable enough, goal is to change default to auto */       \
+  product(ccstr, ErgonomicsProfile, "shared",                               \
           "Ergonomics profile to use. "                                     \
-          "\"auto\" by default. "                                           \
-          "\"shared\" for traditional environments and \"dedicated\" for"   \
-          "environments with dedicated resources for the JVM")              \
+          "\"auto\" for automatic selection. "                              \
+          "\"shared\" for traditional environments (default). "             \
+          "\"dedicated\" for environments with dedicated resources.")       \
                                                                             \
   /* notice: the max range value here is INT_MAX not UINT_MAX  */           \
   /* to protect from overflows                                 */           \

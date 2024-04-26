@@ -271,6 +271,8 @@ class Arguments : AllStatic {
   // Setup heap size
   static void set_heap_size();
 
+  static void set_ergonomics_profiles_heap_size_max_ram_percentage(julong phys_mem);
+
   // Bytecode rewriting
   static void set_bytecode_flags();
 

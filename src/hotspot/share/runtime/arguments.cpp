@@ -1442,7 +1442,10 @@ void Arguments::set_use_compressed_klass_ptrs() {
 }
 
 static void validate_ergonomics_profile() {
-  if (strcmp(ErgonomicsProfile, "shared") != 0 && strcmp(ErgonomicsProfile, "dedicated") != 0) {
+  if (
+      strcmp(ErgonomicsProfile, "shared") != 0 &&
+      strcmp(ErgonomicsProfile, "dedicated") != 0 &&
+      strcmp(ErgonomicsProfile, "auto") != 0){
     vm_exit_during_initialization(err_msg("Unsupported ErgonomicsProfile: %s", ErgonomicsProfile));
   }
 }
@@ -1479,16 +1482,18 @@ jint Arguments::set_ergonomics_flags() {
 void Arguments::set_ergonomics_profile() {
   validate_ergonomics_profile();
 
-  // Uncomment the following code to enable this feature once it has been validated by the OpenJDK community
-  // Set default ergonomics profile based on containerization
-  if (FLAG_IS_DEFAULT(ErgonomicsProfile)){
-#ifdef LINUX
+  // Check if the value is 'auto'.
+  if (strcmp(ErgonomicsProfile, "auto") == 0) {
+    // Set the ergonomics profile based on platform.
+    // If it is a Linux environment, check if we are inside a container.
+    // If yes, we apply dedicated automatically.
+    // May support other platforms in the future (e.g. Windows Containers, Solaris Zones, FreeBSD Jails, Virtuozzo OpenVZ, etc).
+    #ifdef LINUX
     if (OSContainer::is_containerized()){
       FLAG_SET_ERGO(ErgonomicsProfile, "dedicated");
-    } else {
+    } else 
+    #endif //LINUX
       FLAG_SET_ERGO(ErgonomicsProfile, "shared");
-    }
-#endif //LINUX
   }
 
   // Store so we can expose through JMX RuntimeMBean
@@ -1539,21 +1544,8 @@ void Arguments::set_heap_size() {
                                        : (julong)MaxRAM;
   }
 
-  // Update default heap size for dedicated ergonomics profile
-  if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
-    FLAG_SET_DEFAULT(InitialRAMPercentage, 50.0);
-    if (phys_mem >= 16*G){
-      FLAG_SET_DEFAULT(MaxRAMPercentage, 90.0); 
-    } else if (phys_mem >= 6*G){
-      FLAG_SET_DEFAULT(MaxRAMPercentage, 85.0);
-    } else if (phys_mem >= 4*G){
-      FLAG_SET_DEFAULT(MaxRAMPercentage, 80.0);
-    } else if (phys_mem >= 0.5*G){
-      FLAG_SET_DEFAULT(MaxRAMPercentage, 75.0);
-    } else { 
-      FLAG_SET_DEFAULT(MaxRAMPercentage, 50.0);
-    }
-  }
+  set_ergonomics_profiles_heap_size_max_ram_percentage(phys_mem);
+
   // If the maximum heap size has not been set with -Xmx,
   // then set it as fraction of the size of physical memory,
   // respecting the maximum and minimum sizes of the heap.
@@ -1657,6 +1649,25 @@ void Arguments::set_heap_size() {
     if (MinHeapSize == 0) {
       FLAG_SET_ERGO(MinHeapSize, MIN2((size_t)reasonable_minimum, InitialHeapSize));
       log_trace(gc, heap)("  Minimum heap size " SIZE_FORMAT, MinHeapSize);
+    }
+  }
+}
+
+void Arguments::set_ergonomics_profiles_heap_size_max_ram_percentage(julong phys_mem) {
+  // Update default heap size for dedicated ergonomics profile
+  if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
+    FLAG_SET_ERGO_IF_DEFAULT(InitialRAMPercentage, 50.0);
+    
+    if (phys_mem >= 16 * G) {
+      FLAG_SET_ERGO_IF_DEFAULT(MaxRAMPercentage, 90.0);
+    } else if (phys_mem >= 6 * G) {
+      FLAG_SET_ERGO_IF_DEFAULT(MaxRAMPercentage, 85.0);
+    } else if (phys_mem >= 4 * G) {
+      FLAG_SET_ERGO_IF_DEFAULT(MaxRAMPercentage, 80.0);
+    } else if (phys_mem >= 0.5 * G) {
+      FLAG_SET_ERGO_IF_DEFAULT(MaxRAMPercentage, 75.0);
+    } else {
+      FLAG_SET_ERGO_IF_DEFAULT(MaxRAMPercentage, 50.0);
     }
   }
 }
