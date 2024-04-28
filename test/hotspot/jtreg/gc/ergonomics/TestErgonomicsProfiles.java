@@ -41,6 +41,9 @@ import jdk.test.lib.containers.docker.Common;
 import jdk.test.lib.containers.docker.DockerRunOptions;
 import jdk.test.lib.containers.docker.DockerTestUtils;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import jdk.test.lib.Platform;
 import jdk.test.lib.Utils;
 
@@ -60,80 +63,136 @@ import jdk.test.whitebox.gc.GC;
  */
 public class TestErgonomicsProfiles {
 
-  public static void main(String[] args) throws Exception {  
+  private final static String imageNameAndTag = "ergoimage:latest";
+
+  private static final String DEDICATED_PROFILE = "dedicated";
+  private static final String SHARED_PROFILE = "shared";
+  private static final String AUTO_SELECTION = "auto";
+
+  public static void main(String[] args) throws Exception {
     testInvalidProfile();
 
     // Test manual selection
-    testErgonomicProfile("dedicated", "dedicated");
-    testErgonomicProfile("shared", "shared");
-    testDefaultErgonomicProfile("shared"); // default profile is shared. Change if default changes.
+    testErgonomicProfile(DEDICATED_PROFILE, DEDICATED_PROFILE);
+    testErgonomicProfile(SHARED_PROFILE, SHARED_PROFILE);
 
-    // Test automatic selection and default, inside container
-    testInsideContainer("auto", "shared"); // default profile is shared even inside containers. Change if default changes.
+    testDefaultErgonomicProfile(SHARED_PROFILE); // default profile is shared. Change if default changes.
 
-    // TODO: test GC selection and Heap Size
+    // Tests inside containers
+    try {
+      // Prepare container image
+      prepareContainerImage();
+
+      // Test automatic selection and default, inside container
+      testProfileInsideContainer(AUTO_SELECTION, DEDICATED_PROFILE);
+
+      // Test GC selection
+      // See GC selection in gcConfig.cpp::select_gc_ergonomically_dedicated
+      testGCSelection(DEDICATED_PROFILE, "UseSerialGC", 1, 1024);
+      //testGCSelection(DEDICATED_PROFILE, "UseZGC", 2, 16 * 1024); // 16G or more, use ZGC
+      //testGCSelection(DEDICATED_PROFILE, "UseG1GC", 2, 2 * 1024 + 1); // above 2GB, use G1
+      testGCSelection(DEDICATED_PROFILE, "UseParallelGC", 2, 1024); // below 2G, use Parallel
+
+      // Test Heap Size allocation (MaxRAMPercentage)
+      // See heap size MaxRAMPercentage ergo selection for dedicated in
+      // arguments.cpp::set_ergonomics_profiles_heap_size_max_ram_percentage
+      // Test MaxRAMPercentage selection for dedicated profile
+      testMaxRAMPercentageSelection(DEDICATED_PROFILE, 50.0, 256); // less than 0.5G, MaxRAMPercentage should be 50.0
+      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, 75.0, 1 * 1024); // 0.5G to 4G,
+      // MaxRAMPercentage should be 75.0
+      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, 80.0, 4 * 1024); // 4G to 6G,
+      // MaxRAMPercentage should be 80.0
+      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, 85.0, 6 * 1024); // 6G to 16G,
+      // MaxRAMPercentage should be 85.0
+      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, 90.0, 16 * 1024); // 16G or more,
+      // MaxRAMPercentage should be 90.0
+    } finally {
+      if (!DockerTestUtils.RETAIN_IMAGE_AFTER_TEST) {
+        DockerTestUtils.removeDockerImage(imageNameAndTag);
+      }
+    }
   }
 
   private static void testInvalidProfile() throws Exception {
-    String[] baseArgs = {"-XX:ErgonomicsProfile=invalid", "-XX:+PrintFlagsFinal", "-version"};
+    String[] baseArgs = { "-XX:ErgonomicsProfile=invalid", "-XX:+PrintFlagsFinal", "-version" };
 
     // Base test with invalid ergonomics profile
     OutputAnalyzer output = ProcessTools.executeLimitedTestJava(baseArgs);
     output
-      .shouldHaveExitValue(1)
-      .stderrContains("Unsupported ErgonomicsProfile: invalid");
+        .shouldHaveExitValue(1)
+        .stderrContains("Unsupported ErgonomicsProfile: invalid");
   }
 
   private static void testDefaultErgonomicProfile(String expectedProfile) throws Exception {
-    String[] baseArgs = {"-XX:+PrintFlagsFinal", "-version"};
+    String[] baseArgs = { "-XX:+PrintFlagsFinal", "-version" };
 
     // Base test with default ergonomics profile
     ProcessTools.executeLimitedTestJava(baseArgs)
-      .shouldHaveExitValue(0)
-      .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
+        .shouldHaveExitValue(0)
+        .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
   }
 
   private static void testErgonomicProfile(String ergonomicsProfile, String expectedProfile) throws Exception {
-    String[] baseArgs = {"-XX:ErgonomicsProfile=" + ergonomicsProfile, "-XX:+PrintFlagsFinal", "-version"};
+    String[] baseArgs = { "-XX:ErgonomicsProfile=" + ergonomicsProfile, "-XX:+PrintFlagsFinal", "-version" };
 
     // Base test with selected ergonomics profile
     ProcessTools.executeLimitedTestJava(baseArgs)
-      .shouldHaveExitValue(0)
-      .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
+        .shouldHaveExitValue(0)
+        .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
   }
 
-  private static void testInsideContainer(String ergonomicsProfile, String expectedProfile) throws Exception {
-    String[] javaOpts = {"-XX:ErgonomicsProfile=" + ergonomicsProfile, "-XX:+PrintFlagsFinal"};
-
+  private static void prepareContainerImage() throws Exception {
     if (!DockerTestUtils.canTestDocker()) {
       System.out.println("Docker not available, skipping test");
-      return;
+      throw new SkippedException("Docker not available");
     }
 
-    final String imageNameAndTag = "ergoimage";
-
-    String dockerfile =
-      "FROM --platform=linux/amd64 ubuntu:latest\n" +
-      "COPY /jdk /jdk\n" +
-      "ENV JAVA_HOME=/jdk\n" +
-      "CMD [\"/bin/bash\"]\n";
+    String dockerfile = "FROM --platform=linux/amd64 ubuntu:latest\n" +
+        "COPY /jdk /jdk\n" +
+        "ENV JAVA_HOME=/jdk\n" +
+        "CMD [\"/bin/bash\"]\n";
 
     DockerTestUtils.buildJdkContainerImage(imageNameAndTag, dockerfile);
+  }
 
-    try {
-        DockerRunOptions opts =
-            new DockerRunOptions(imageNameAndTag, "/jdk/bin/java", "-version", javaOpts);
-        opts.addDockerOpts("--platform=linux/amd64");
+  private static void testProfileInsideContainer(String ergonomicsProfile, String expectedProfile) throws Exception {
+    String[] javaOpts = { "-XX:ErgonomicsProfile=" + ergonomicsProfile, "-XX:+PrintFlagsFinal" };
 
-        DockerTestUtils.dockerRunJava(opts)
-            .shouldHaveExitValue(0)
-            .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
-    
-    } finally {
-        if (!DockerTestUtils.RETAIN_IMAGE_AFTER_TEST) {
-            DockerTestUtils.removeDockerImage(imageNameAndTag);
-        }
-    }
+    DockerRunOptions opts = new DockerRunOptions(imageNameAndTag, "/jdk/bin/java", "-version", javaOpts);
+    opts.addDockerOpts("--rm");
+
+    DockerTestUtils.dockerRunJava(opts)
+        .shouldHaveExitValue(0)
+        .stdoutShouldMatch("ErgonomicsProfile.*" + expectedProfile);
+  }
+
+  public static void testGCSelection(String profile, String expectedGC, int cpuCount, int memoryInMB) throws Exception {
+    String[] javaOpts = { "-XX:ErgonomicsProfile=" + profile, "-XX:+PrintFlagsFinal" };
+
+    DockerRunOptions opts = new DockerRunOptions(imageNameAndTag, "/jdk/bin/java", "-version", javaOpts);
+    opts.addDockerOpts("--rm", "--cpus", String.valueOf(cpuCount), "--memory", memoryInMB + "m");
+
+    OutputAnalyzer output = DockerTestUtils.dockerRunJava(opts);
+    output.shouldHaveExitValue(0);
+
+    // Check GC
+    output.stdoutShouldMatch(expectedGC + ".*true");
+  }
+
+  private static void testMaxRAMPercentageSelection(String profile, double expectedMaxRAMPercentage, int physMem)
+      throws Exception {
+    String[] javaOpts = { "-XX:ErgonomicsProfile=" + profile, "-XX:+PrintFlagsFinal" };
+
+    DockerRunOptions opts = new DockerRunOptions(imageNameAndTag, "/jdk/bin/java", "-version", javaOpts);
+    opts.addDockerOpts("--rm", "--memory", physMem + "m");
+
+    // Run JVM with the given arguments
+    OutputAnalyzer output = DockerTestUtils.dockerRunJava(opts);
+    output.shouldHaveExitValue(0);
+
+    // Check that MaxRAMPercentage is set to the expected value
+    output.shouldHaveExitValue(0);
+    output.stdoutShouldMatch("MaxRAMPercentage.*" + expectedMaxRAMPercentage);
   }
 
 }
