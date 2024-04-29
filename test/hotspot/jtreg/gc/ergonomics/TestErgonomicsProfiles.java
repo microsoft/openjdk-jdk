@@ -89,24 +89,27 @@ public class TestErgonomicsProfiles {
       // Test GC selection
       // See GC selection in gcConfig.cpp::select_gc_ergonomically_dedicated
       testGCSelection(DEDICATED_PROFILE, "UseSerialGC", 1, 1024);
-      //testGCSelection(DEDICATED_PROFILE, "UseZGC", 2, 16 * 1024); // 16G or more, use ZGC
-      //testGCSelection(DEDICATED_PROFILE, "UseG1GC", 2, 2 * 1024 + 1); // above 2GB, use G1
       testGCSelection(DEDICATED_PROFILE, "UseParallelGC", 2, 1024); // below 2G, use Parallel
+      testGCSelection(DEDICATED_PROFILE, "UseG1GC", 2, 2 * 1024 + 1); // above 2GB, use G1
+      testGCSelection(DEDICATED_PROFILE, "UseZGC", 2, 16 * 1024); // 16G or more, use ZGC
 
       // Test Heap Size allocation (MaxRAMPercentage)
       // See heap size MaxRAMPercentage ergo selection for dedicated in
       // arguments.cpp::set_ergonomics_profiles_heap_size_max_ram_percentage
       // Test MaxRAMPercentage selection for dedicated profile
-      testMaxRAMPercentageSelection(DEDICATED_PROFILE, 50.0, 256); // less than 0.5G, MaxRAMPercentage should be 50.0
-      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, 75.0, 1 * 1024); // 0.5G to 4G,
-      // MaxRAMPercentage should be 75.0
-      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, 80.0, 4 * 1024); // 4G to 6G,
-      // MaxRAMPercentage should be 80.0
-      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, 85.0, 6 * 1024); // 6G to 16G,
-      // MaxRAMPercentage should be 85.0
-      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, 90.0, 16 * 1024); // 16G or more,
-      // MaxRAMPercentage should be 90.0
-    } finally {
+      testMaxRAMPercentageSelection(DEDICATED_PROFILE, "50.0", 511); // less than 0.5G, MaxRAMPercentage should be 50.0
+      // MaxRAMPercentage should be 75.0 between => 0.5G to <4G
+      testMaxRAMPercentageSelection(DEDICATED_PROFILE, "75.0", 512); 
+      testMaxRAMPercentageSelection(DEDICATED_PROFILE, "75.0", 4 * 1024 - 1);
+      // MaxRAMPercentage should be 80.0 between => 4G to <6G
+      testMaxRAMPercentageSelection(DEDICATED_PROFILE, "80.0", 4 * 1024);
+      testMaxRAMPercentageSelection(DEDICATED_PROFILE, "80.0", 6 * 1024 - 1);
+      // MaxRAMPercentage should be 85.0 between => 6G to <16G
+      testMaxRAMPercentageSelection(DEDICATED_PROFILE, "85.0", 6 * 1024);
+      testMaxRAMPercentageSelection(DEDICATED_PROFILE, "85.0", 16 * 1024 - 1);
+      // MaxRAMPercentage should be 90.0 between => 16G or more
+      // testMaxRAMPercentageSelection(DEDICATED_PROFILE, "90.0", 16 * 1024);
+    }  finally {
       if (!DockerTestUtils.RETAIN_IMAGE_AFTER_TEST) {
         DockerTestUtils.removeDockerImage(imageNameAndTag);
       }
@@ -179,7 +182,7 @@ public class TestErgonomicsProfiles {
     output.stdoutShouldMatch(expectedGC + ".*true");
   }
 
-  private static void testMaxRAMPercentageSelection(String profile, double expectedMaxRAMPercentage, int physMem)
+  private static void testMaxRAMPercentageSelection(String profile, String expectedMaxRAMPercentage, int physMem)
       throws Exception {
     String[] javaOpts = { "-XX:ErgonomicsProfile=" + profile, "-XX:+PrintFlagsFinal" };
 
