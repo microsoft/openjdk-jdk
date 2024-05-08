@@ -125,10 +125,6 @@ void select_gc_ergonomically_dedicated() {
 #if INCLUDE_SERIALGC
       FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
 #endif
-    } else if (phys_mem >= 16*G) {
-#if INCLUDE_ZGC
-      FLAG_SET_ERGO_IF_DEFAULT(UseZGC, true);
-#endif
     } else if (phys_mem > 2048*M) {
 #if INCLUDE_G1GC
       FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
