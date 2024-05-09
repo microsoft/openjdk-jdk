@@ -85,7 +85,6 @@ SHENANDOAHGC_ONLY_ARG(IncludedGC(UseShenandoahGC,    CollectedHeap::Shenandoah, 
 
 GCArguments* GCConfig::_arguments = nullptr;
 bool GCConfig::_gc_selected_ergonomically = false;
-const char* GCConfig::_gc_name = nullptr;
 
 void GCConfig::fail_if_non_included_gc_is_selected() {
   NOT_EPSILONGC(   FAIL_IF_SELECTED(UseEpsilonGC));
@@ -201,10 +200,6 @@ GCArguments* GCConfig::select_gc() {
   // Exactly one GC selected
   FOR_EACH_INCLUDED_GC(gc) {
     if (gc->_flag) {
-      _gc_name = gc->_hs_err_name;
-      if (ZGenerational) {
-        _gc_name = "z gen gc";
-      }
       return &gc->_arguments;
     }
   }
@@ -245,10 +240,6 @@ bool GCConfig::is_gc_selected(CollectedHeap::Name name) {
 
 bool GCConfig::is_gc_selected_ergonomically() {
   return _gc_selected_ergonomically;
-}
-
-const char* GCConfig::gc_name() {
-  return _gc_name;
 }
 
 const char* GCConfig::hs_err_name() {

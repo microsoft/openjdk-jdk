@@ -137,10 +137,6 @@ class RuntimeImpl implements RuntimeMXBean {
         return jvm.getErgonomicsProfile();
     }
 
-    public String getGCName() {
-        return jvm.getGCName();
-    }
-
     public ObjectName getObjectName() {
         return Util.newObjectName(ManagementFactory.RUNTIME_MXBEAN_NAME);
     }

@@ -371,12 +371,4 @@ public interface RuntimeMXBean extends PlatformManagedObject {
      * @return the name of the selected ergonomics profile
      */
     public String getJvmErgonomicsProfile();
-
-    /**
-     * Returns the name of the active garbage collector.
-     * 
-     * @return the name of the active GC in this runtime
-     */
-    public String getGCName();
-
 }
