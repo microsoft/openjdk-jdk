@@ -125,9 +125,10 @@
           "Use the Shenandoah garbage collector")                           \
                                                                             \
   /* notice: once stable enough, goal is to change default to auto */       \
+  product(bool, AutoErgonomicsProfile, false, "Use automatic selection of " \
+          "ergonomics profiles.")                                           \
   product(ccstr, ErgonomicsProfile, "shared",                               \
           "Ergonomics profile to use. "                                     \
-          "\"auto\" for automatic selection. "                              \
           "\"shared\" for traditional environments (default). "             \
           "\"dedicated\" for environments with dedicated resources.")       \
                                                                             \

@@ -1442,10 +1442,13 @@ void Arguments::set_use_compressed_klass_ptrs() {
 }
 
 static void validate_ergonomics_profile() {
-  if (
+  if (AutoErgonomicsProfile && FLAG_IS_CMDLINE(ErgonomicsProfile)) {
+    vm_exit_during_initialization(err_msg("Automatic ergonomics profile selection is enabled. Do not set a specific profile at the same time."));
+  }
+
+  if (FLAG_IS_CMDLINE(ErgonomicsProfile) && 
       strcmp(ErgonomicsProfile, "shared") != 0 &&
-      strcmp(ErgonomicsProfile, "dedicated") != 0 &&
-      strcmp(ErgonomicsProfile, "auto") != 0){
+      strcmp(ErgonomicsProfile, "dedicated") != 0) {
     vm_exit_during_initialization(err_msg("Unsupported ErgonomicsProfile: %s", ErgonomicsProfile));
   }
 }
@@ -1463,8 +1466,6 @@ void Arguments::set_conservative_max_heap_alignment() {
 
 jint Arguments::set_ergonomics_flags() {
   GCConfig::initialize();
-  // Store the name of the selected GC
-  PropertyList_add(&_system_properties, new SystemProperty("java.vm.gc.name", GCConfig::gc_name(),  false));
 
   set_conservative_max_heap_alignment();
 
@@ -1483,7 +1484,7 @@ void Arguments::set_ergonomics_profile() {
   validate_ergonomics_profile();
 
   // Check if the value is 'auto'.
-  if (strcmp(ErgonomicsProfile, "auto") == 0) {
+  if (AutoErgonomicsProfile) {
     // Set the ergonomics profile based on platform.
     // If it is a Linux environment, check if we are inside a container.
     // If yes, we apply dedicated automatically.
@@ -1491,9 +1492,12 @@ void Arguments::set_ergonomics_profile() {
     #ifdef LINUX
     if (OSContainer::is_containerized()){
       FLAG_SET_ERGO(ErgonomicsProfile, "dedicated");
-    } else 
+    }
     #endif //LINUX
+
+    if (FLAG_IS_DEFAULT(ErgonomicsProfile)) {
       FLAG_SET_ERGO(ErgonomicsProfile, "shared");
+    }
   }
 
   // Store so we can expose through JMX RuntimeMBean
