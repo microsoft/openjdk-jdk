@@ -115,7 +115,6 @@ void select_gc_ergonomically_shared() {
 // It first checks the physical memory available on the system and the number of active processors.
 // Depending on these factors, it sets the appropriate GC flag to true using the FLAG_SET_ERGO_IF_DEFAULT macro.
 // If the system has only one active processor, it selects the Serial GC, no matter how much memory is available.
-// If the system has more than one active processor and the physical memory is greater than or equal to 16GB, it selects the ZGC.
 // If the physical memory is greater than 2GB, it selects the G1GC.
 // Otherwise, it selects the Parallel GC.
 void select_gc_ergonomically_dedicated() {
