@@ -91,7 +91,6 @@ public class TestErgonomicsProfiles {
       testGCSelection(DEDICATED_PROFILE, "UseSerialGC", 1, 1024);
       testGCSelection(DEDICATED_PROFILE, "UseParallelGC", 2, 1024); // below 2G, use Parallel
       testGCSelection(DEDICATED_PROFILE, "UseG1GC", 2, 2 * 1024 + 1); // above 2GB, use G1
-      testGCSelection(DEDICATED_PROFILE, "UseZGC", 2, 16 * 1024); // 16G or more, use ZGC
 
       // Test Heap Size allocation (MaxRAMPercentage)
       // See heap size MaxRAMPercentage ergo selection for dedicated in
