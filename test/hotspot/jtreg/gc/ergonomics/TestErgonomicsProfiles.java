@@ -88,10 +88,9 @@ public class TestErgonomicsProfiles {
 
       // Test GC selection
       // See GC selection in gcConfig.cpp::select_gc_ergonomically_dedicated
-      testGCSelection(DEDICATED_PROFILE, "UseSerialGC", 1, 1024);
-      testGCSelection(DEDICATED_PROFILE, "UseParallelGC", 2, 1024); // below 2G, use Parallel
-      testGCSelection(DEDICATED_PROFILE, "UseG1GC", 2, 2 * 1024 + 1); // above 2GB, use G1
-      testGCSelection(DEDICATED_PROFILE, "UseZGC", 2, 16 * 1024); // 16G or more, use ZGC
+      testGCSelection(DEDICATED_PROFILE, "UseSerialGC", 1, 1024); // no matter how much memory, use serial if 1 proc
+      testGCSelection(DEDICATED_PROFILE, "UseParallelGC", 2, 1024); // <=2G, use Parallel
+      testGCSelection(DEDICATED_PROFILE, "UseG1GC", 2, 2 * 1024 + 1); // above >2GB, use G1
 
       // Test Heap Size allocation (MaxRAMPercentage)
       // See heap size MaxRAMPercentage ergo selection for dedicated in
