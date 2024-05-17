@@ -1178,7 +1178,7 @@ public class IRNode {
     static {
         vectorNode(COUNT_LEADING_ZEROS_VI, "CountLeadingZerosV", TYPE_INT);
     }
-
+	
     public static final String POPULATE_INDEX = PREFIX + "POPULATE_INDEX" + POSTFIX;
     static {
         String regex = START + "PopulateIndex" + MID + END;
@@ -1335,6 +1335,16 @@ public class IRNode {
     public static final String RSHIFT_VI = VECTOR_PREFIX + "RSHIFT_VI" + POSTFIX;
     static {
         vectorNode(RSHIFT_VI, "RShiftVI", TYPE_INT);
+    }
+
+    public static final String SAFEPOINT_SCALAR_MERGE = PREFIX + "SAFEPOINT_SCALAR_MERGE" + POSTFIX;
+    static {
+        beforeMatchingNameRegex(SAFEPOINT_SCALAR_MERGE, "SafePointScalarMerge");
+    }
+
+    public static final String SAFEPOINT_SCALAR_OBJECT = PREFIX + "SAFEPOINT_SCALAR_OBJECT" + POSTFIX;
+    static {
+        beforeMatchingNameRegex(SAFEPOINT_SCALAR_OBJECT, "SafePointScalarObject");
     }
 
     public static final String RSHIFT_VL = VECTOR_PREFIX + "RSHIFT_VL" + POSTFIX;
