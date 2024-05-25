@@ -55,66 +55,257 @@ jobs:
       fail-fast: false
       matrix:
         test-name:
-          - 'jdk/tier1 part 1'
-          - 'jdk/tier1 part 2'
-          - 'jdk/tier1 part 3'
-          - 'langtools/tier1'
-          - 'hs/tier1 common'
-          - 'hs/tier1 compiler part 1'
-          - 'hs/tier1 compiler part 2'
-          - 'hs/tier1 compiler part 3'
-          - 'hs/tier1 compiler not-xcomp'
-          - 'hs/tier1 gc'
-          - 'hs/tier1 runtime'
-          - 'hs/tier1 serviceability'
-          - 'lib-test/tier1'
+          - 'group_1'
+          - 'group_2'
+          - 'group_3'
+          - 'group_3'
+          - 'group_4'
+          - 'group_5'
+          - 'group_6'
+          - 'group_7'
+          - 'group_8'
+          - 'group_9'
+          - 'group_10'
+          - 'group_11'
+          - 'group_12'
+          - 'group_13'
+          - 'group_14'
+          - 'group_15'
+          - 'group_16'
+          - 'group_17'
+          - 'group_18'
+          - 'group_19'
+          - 'group_20'
+          - 'group_22'
+          - 'group_22'
+          - 'group_23'
+          - 'group_24'
+          - 'group_25'
+          - 'group_26'
+          - 'group_27'
+          - 'group_28'
+          - 'group_28'
+          - 'group_29'
+          - 'group_30'
+          - 'group_31'
+          - 'group_32'
+          - 'group_33'
+          - 'group_34'
+          - 'group_35'
+          - 'group_36'
+          - 'group_37'
+          - 'group_38'
+          - 'group_39'
+          - 'group_40'
+          - 'group_41'
+          - 'group_42'
+          - 'group_43'
+          - 'group_44'
+          - 'group_45'
+          - 'group_46'
+          - 'group_47'
+          - 'group_48'
+          - 'group_49'
+          - 'group_50'
 
         include:
-          - test-name: 'jdk/tier1 part 1'
+          - test-name: 'group_1'
             test-suite: 'test/langtools/:tier1'
 
-          - test-name: 'jdk/tier1 part 2'
+          - test-name: 'group_2'
             test-suite: 'test/langtools/:tier1'
 
-          - test-name: 'jdk/tier1 part 3'
+          - test-name: 'group_3'
             test-suite: 'test/langtools/:tier1'
 
-          - test-name: 'langtools/tier1'
+          - test-name: 'group_3'
             test-suite: 'test/langtools/:tier1'
 
-          - test-name: 'hs/tier1 common'
-            test-suite: 'test/langtools/:tier1'
-            debug-suffix: -debug
-
-          - test-name: 'hs/tier1 compiler part 1'
+          - test-name: 'group_4'
             test-suite: 'test/langtools/:tier1'
             debug-suffix: -debug
 
-          - test-name: 'hs/tier1 compiler part 2'
+          - test-name: 'group_5'
             test-suite: 'test/langtools/:tier1'
             debug-suffix: -debug
 
-          - test-name: 'hs/tier1 compiler part 3'
+          - test-name: 'group_6'
             test-suite: 'test/langtools/:tier1'
             debug-suffix: -debug
 
-          - test-name: 'hs/tier1 compiler not-xcomp'
+          - test-name: 'group_7'
             test-suite: 'test/langtools/:tier1'
             debug-suffix: -debug
 
-          - test-name: 'hs/tier1 gc'
+          - test-name: 'group_8'
             test-suite: 'test/langtools/:tier1'
             debug-suffix: -debug
 
-          - test-name: 'hs/tier1 runtime'
+          - test-name: 'group_9'
             test-suite: 'test/langtools/:tier1'
             debug-suffix: -debug
 
-          - test-name: 'hs/tier1 serviceability'
+          - test-name: 'group_10'
             test-suite: 'test/langtools/:tier1'
             debug-suffix: -debug
 
-          - test-name: 'lib-test/tier1'
+          - test-name: 'group_11'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_12'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_13'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_14'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_15'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_16'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_17'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_18'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_19'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_20'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_21'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_22'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_23'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_24'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_25'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_26'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_27'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_28'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_29'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_30'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_31'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_32'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_33'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_34'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_35'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_36'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_37'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_38'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_39'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_40'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_41'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_42'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_43'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_44'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_45'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_46'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_47'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_48'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_49'
+            test-suite: 'test/langtools/:tier1'
+            debug-suffix: -debug
+
+          - test-name: 'group_50'
             test-suite: 'test/langtools/:tier1'
             debug-suffix: -debug
 
