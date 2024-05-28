@@ -59,7 +59,8 @@ ifeq ($(call isTargetOs, windows), true)
   ##############################################################################
 
   $(eval $(call SetupJdkLibrary, BUILD_LIBWINDOWSACCESSBRIDGE, \
-      NAME := windowsaccessbridge, \
+      NAME := windowsaccessbridge-64, \
+      SRC := libwindowsaccessbridge, \
       EXTRA_SRC := common, \
       OPTIMIZATION := LOW, \
       DISABLED_WARNINGS_microsoft_WinAccessBridge.cpp := 4302 4311, \
