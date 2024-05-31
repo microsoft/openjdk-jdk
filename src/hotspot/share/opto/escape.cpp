@@ -1279,7 +1279,6 @@ bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, No
 }
 
 void ConnectionGraph::reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist, Unique_Node_List &reducible_merges) {
-
   Unique_Node_List nested_phis;
   // Collect nested phi nodes
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
@@ -1288,8 +1287,11 @@ void ConnectionGraph::reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_wo
       nested_phis.push(use);
     }
   }
-  // make sure to process child phi nodes before parent phi nodes in nested phi scenario
-  for (uint i=0; i<nested_phis.size(); i++) {
+
+  // Processing child phi nodes ahead of parent phi nodes in nested scenarios is crucial.
+  // This sequence guarantees that optimizations and splits are applied to child phi nodes in the 
+  // optimal graph configuration before the reduction process involving parent phi nodes takes place.
+  for (uint i = 0; i < nested_phis.size(); i++) {
     Node *nested_phi = nested_phis.at(i);
     reduce_phi(nested_phi->as_Phi(), alloc_worklist, memnode_worklist, reducible_merges);
   }

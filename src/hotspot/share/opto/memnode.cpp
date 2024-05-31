@@ -1615,13 +1615,12 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
 // Note that this function doesn't perform any optimizations itself.
 // If optimization is impossible, it returns nullptr.
 Node* LoadNode::get_memory_node_for_nested_phi_after_optimization(PhaseGVN* phase, Node *basephi, Node* base_parentphi) {
-
   Node* mem        = in(Memory);
   Node *address    = in(Address);
   assert(basephi != nullptr && basephi->is_Phi(), "sanity");
   assert(base_parentphi != nullptr && base_parentphi->is_Phi(), "sanity");
   Node* region = get_region_to_split_through_phi(basephi, mem);
-  if (!region && basephi->in(0) != mem->in(0)) {
+  if (region == nullptr && basephi->in(0) != mem->in(0)) {
     if (MemNode::all_controls_dominate(address, mem->in(0))) {
       region = mem->in(0);
     } else {
@@ -3187,8 +3186,7 @@ bool MergePrimitiveArrayStores::is_con_RShift(const Node* n, Node const*& base_o
       n->in(2)->is_ConI()) {
     base_out = n->in(1);
     shift_out = n->in(2)->get_int();
-    assert(shift_out >= 0, "must be positive");
-    return true;
+    return shift_out >= 0;
   }
   return false;
 }

@@ -1178,7 +1178,7 @@ public class IRNode {
     static {
         vectorNode(COUNT_LEADING_ZEROS_VI, "CountLeadingZerosV", TYPE_INT);
     }
-	
+
     public static final String POPULATE_INDEX = PREFIX + "POPULATE_INDEX" + POSTFIX;
     static {
         String regex = START + "PopulateIndex" + MID + END;
