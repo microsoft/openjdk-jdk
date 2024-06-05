@@ -3012,7 +3012,7 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
           return;
         }
       } else {
-	tty->print_cr("%s) Not adjusting SR state because has_non_reducible_merge.", _compile->method()->name()->as_utf8());
+	// tty->print_cr("%s) Not adjusting SR state because has_non_reducible_merge.", _compile->method()->name()->as_utf8());
       }
     }
   }

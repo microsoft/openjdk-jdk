@@ -517,7 +517,7 @@ Node *PhaseMacroExpand::value_from_mem(Node *sfpt_mem, Node *sfpt_ctl, BasicType
   if (mem != nullptr) {
     if (mem == start_mem || mem == alloc_mem) {
       // hit a sentinel, return appropriate 0 value
-      tty->print_cr("%s) Hit %s memory sentinel.", C->method()->name()->as_utf8(), (mem == start_mem) ? "start" : "alloc");
+      // tty->print_cr("%s) Hit %s memory sentinel.", C->method()->name()->as_utf8(), (mem == start_mem) ? "start" : "alloc");
       return _igvn.zerocon(ft);
     } else if (mem->is_Store()) {
       Node* n = mem->in(MemNode::ValueIn);

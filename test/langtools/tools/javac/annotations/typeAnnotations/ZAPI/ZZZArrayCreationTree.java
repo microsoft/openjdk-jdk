@@ -48,14 +48,20 @@ import com.sun.source.util.TreeScanner;
 import javax.tools.StandardJavaFileManager;
 
 
-public class ArrayCreationTree {
+public class ZZZArrayCreationTree {
     public static void main(String[] args) throws Exception {
+	for (int i=0; i<16000; i++) {
+		just_do_it();
+	}
+    }
+
+    public static void just_do_it() throws Exception {
         PrintWriter out = new PrintWriter(System.out, true);
         JavacTool tool = JavacTool.create();
         try (StandardJavaFileManager fm = tool.getStandardFileManager(null, null, null)) {
             File testSrc = new File(System.getProperty("test.src"));
             Iterable<? extends JavaFileObject> f =
-                fm.getJavaFileObjectsFromFiles(Arrays.asList(new File(testSrc, "ArrayCreationTree.java")));
+                fm.getJavaFileObjectsFromFiles(Arrays.asList(new File(testSrc, "ZZZArrayCreationTree.java")));
             JavacTask task = tool.getTask(out, fm, null, null, null, f);
             Iterable<? extends CompilationUnitTree> trees = task.parse();
             out.flush();
