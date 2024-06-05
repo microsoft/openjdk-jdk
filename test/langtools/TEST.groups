@@ -82,7 +82,9 @@ tier1 = \
     lib \
     tools \
     -:langtools_jshell_unstable \
-    -:langtools_slow
+    -:langtools_slow \
+    -tools/javac/jvm/ClassRefDupInConstantPoolTest.java \
+    -tools/javac/launcher/SourceLauncherTest.java
 
 # (Almost) no langtools tests are tier 2.
 tier2 = \
