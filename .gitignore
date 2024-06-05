@@ -20,3 +20,5 @@ NashornProfile.txt
 /.settings/
 /compile_commands.json
 /.cache
+jdk-22.0.1
+openjdk-22.0.1_linux-x64_bin.tar.gz

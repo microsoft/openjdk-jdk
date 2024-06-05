@@ -1718,6 +1718,9 @@ const int ObjectAlignmentInBytes = 8;
           "Flag to disable jvmstat instrumentation for performance testing "\
           "and problem isolation purposes")                                 \
                                                                             \
+  product(bool, PerfDataReadByAll, false,                                   \
+          "Allow any user to read hsperfdata file")                         \
+                                                                            \
   product(bool, PerfDataSaveToFile, false,                                  \
           "Save PerfData memory to hsperfdata_<pid> file on exit")          \
                                                                             \

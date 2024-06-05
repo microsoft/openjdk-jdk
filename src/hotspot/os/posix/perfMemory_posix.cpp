@@ -95,7 +95,12 @@ static void save_memory_to_file(char* addr, size_t size) {
 
   int fd;
 
-  RESTARTABLE(os::open(destfile, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR), fd);
+  if (PerfDataReadByAll) {
+    RESTARTABLE(os::open(destfile, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH), fd);
+  } else {
+    RESTARTABLE(os::open(destfile, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR), fd);
+  }
+
   if (fd == OS_ERR) {
     warning("Could not create Perfdata save file: %s: %s\n",
             destfile, os::strerror(errno));

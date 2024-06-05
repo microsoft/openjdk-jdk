@@ -93,8 +93,12 @@ static void save_memory_to_file(char* addr, size_t size) {
   const char* destfile = PerfMemory::get_perfdata_file_path();
   assert(destfile[0] != '\0', "invalid Perfdata file path");
 
-  int fd = ::_open(destfile, _O_BINARY|_O_CREAT|_O_WRONLY|_O_TRUNC,
-                   _S_IREAD|_S_IWRITE);
+  int fd;
+  if (PerfDataReadByAll) {
+    fd = ::_open(destfile, _O_BINARY|_O_CREAT|_O_WRONLY|_O_TRUNC, _S_IREAD|_S_IWRITE|S_IRGRP|S_IROTH);
+  } else {
+    fd = ::_open(destfile, _O_BINARY|_O_CREAT|_O_WRONLY|_O_TRUNC, _S_IREAD|_S_IWRITE);
+  }
 
   if (fd == OS_ERR) {
     if (PrintMiscellaneous && Verbose) {
