@@ -20,8 +20,7 @@ OPTS="-XX:+UnlockDiagnosticVMOptions \
 OPTS="-XX:-UseCompressedOops -XX:+TraceReduceAllocationMerges"
 
 # EXECUTE ONLY THE TEST
-# make test CONF=release TEST=test/langtools/tools/javac/annotations/typeAnnotations/api/ZZZArrayCreationTree.java JTREG="TIMEOUT_FACTOR=100;JAVA_OPTIONS=${OPTS}"
-
+  make test CONF=release TEST=test/langtools/tools/javac/annotations/typeAnnotations/ZAPI/ZZZArrayCreationTree.java JTREG="TIMEOUT_FACTOR=100;JAVA_OPTIONS=${OPTS}"
 
 # EXECUTE ONLY A SUBSET OF TESTS
 # make test CONF=release TEST=test/langtools/tools/javac/annotations/ JTREG="OPTIONS=--max-pool-size=5;JOBS=5;TIMEOUT_FACTOR=100;JAVA_OPTIONS=${OPTS}"
@@ -29,6 +28,5 @@ OPTS="-XX:-UseCompressedOops -XX:+TraceReduceAllocationMerges"
 # EXECUTE ONLY A SUBSET OF TESTS
 # make test CONF=release TEST=test/langtools/:repro JTREG="OPTIONS=--max-pool-size=5;JOBS=5;TIMEOUT_FACTOR=100;JAVA_OPTIONS=${OPTS};REPEAT_COUNT=50"
 
-
 # EXECUTE WHOLE GROUP
-  make test CONF=release TEST=test/langtools/:tier1 JTREG="TIMEOUT_FACTOR=100;JAVA_OPTIONS=${OPTS};REPEAT_COUNT=50"
+#  make test CONF=release TEST=test/langtools/:tier1 JTREG="TIMEOUT_FACTOR=100;JAVA_OPTIONS=${OPTS};REPEAT_COUNT=50"

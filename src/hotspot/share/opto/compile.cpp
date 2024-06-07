@@ -2374,6 +2374,58 @@ void Compile::Optimize() {
     } while (progress);
   }
 
+  // If we are compiling any of our interesting methods, then save to file
+  if (strcmp(method()->name()->as_utf8(), "foldStrings") == 0) {
+    Unique_Node_List wq;
+    wq.push(root());
+    stringStream graph;
+
+    for (uint i = 0; i < wq.size(); ++i) {
+      Node* n = wq.at(i);
+
+      graph.print("%d . %s === ", n->_idx, NodeClassNames[n->Opcode()]);
+
+      for (uint j = 0; j < n->req(); j++) {
+        Node* u = n->in(j);
+        if (u != nullptr) {
+          graph.print(" %d", u->_idx);
+          wq.push(u);
+        }
+      }
+
+      graph.print(" [[ ");
+      for (DUIterator_Fast jmax, j = n->fast_outs(jmax); j < jmax; j++) {
+        Node* u = n->fast_out(j);
+        if (u != nullptr) {
+          graph.print(" %d", u->_idx);
+          wq.push(u);
+        }
+      }
+      graph.print(" ]] ");
+
+      if (n->is_SafePoint()) {
+        graph.print(" # ");
+
+        JVMState* p = n->as_SafePoint()->jvms();
+        while (p != nullptr) {
+          graph.print("jvms bci='%d' method='%s' <= ", p->bci(), p->method()->name()->as_utf8());
+          p = p->caller();
+        }
+      }
+
+      graph.cr();
+    }
+
+    static int counter = 0;
+    stringStream filename;
+    filename.print("/tmp/graph_%d.ir", counter++);
+
+    fileStream fs(filename.freeze());
+    fs.print("%s", graph.freeze());
+    fs.flush();
+    fs.close();
+  }
+
   // Loop transforms on the ideal graph.  Range Check Elimination,
   // peeling, unrolling, etc.
 
