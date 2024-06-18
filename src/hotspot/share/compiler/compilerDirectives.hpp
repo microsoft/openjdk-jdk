@@ -80,7 +80,7 @@
     cflags(PrintIntrinsics,         bool, PrintIntrinsics, PrintIntrinsics) \
 NOT_PRODUCT(cflags(TraceOptoPipelining, bool, TraceOptoPipelining, TraceOptoPipelining)) \
 NOT_PRODUCT(cflags(TraceOptoOutput,     bool, TraceOptoOutput, TraceOptoOutput)) \
-NOT_PRODUCT(cflags(TraceEscapeAnalysis, bool, false, TraceEscapeAnalysis)) \
+    cflags(TraceEscapeAnalysis, bool, false, TraceEscapeAnalysis) \
 NOT_PRODUCT(cflags(PrintIdeal,          bool, PrintIdeal, PrintIdeal)) \
     cflags(TraceSpilling,           bool, TraceSpilling, TraceSpilling) \
     cflags(Vectorize,               bool, false, Vectorize) \

@@ -11,6 +11,8 @@
 
 keys=intermittent randomness needs-src needs-src-jdk_javadoc
 
+maxOutputSize=30000000
+
 # Group definitions
 groups=TEST.groups
 

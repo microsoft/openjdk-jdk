@@ -1113,7 +1113,7 @@ const int ObjectAlignmentInBytes = 8;
           range(-1, 64)                                                     \
                                                                             \
   /* statistics */                                                          \
-  develop(bool, CountCompiledCalls, false,                                  \
+  product(bool, CountCompiledCalls, false,                                  \
           "Count method invocations")                                       \
                                                                             \
   develop(bool, ICMissHistogram, false,                                     \
@@ -1194,7 +1194,7 @@ const int ObjectAlignmentInBytes = 8;
           "CompileThreshold) before using the method's profile")            \
           range(0, 100)                                                     \
                                                                             \
-  product(bool, PrintMethodData, false, DIAGNOSTIC,                         \
+  product(bool, PrintMethodData, false, DIAGNOSTIC,                          \
           "Print the results of +ProfileInterpreter at end of run")         \
                                                                             \
   develop(bool, VerifyDataPointer, trueInDebug,                             \

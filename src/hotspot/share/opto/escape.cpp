@@ -65,13 +65,13 @@ ConnectionGraph::ConnectionGraph(Compile * C, PhaseIterGVN *igvn, int invocation
   // Add unknown java object.
   add_java_object(C->top(), PointsToNode::GlobalEscape);
   phantom_obj = ptnode_adr(C->top()->_idx)->as_JavaObject();
-  set_not_scalar_replaceable(phantom_obj NOT_PRODUCT(COMMA "Phantom object"));
+  set_not_scalar_replaceable(phantom_obj, "Phantom object");
   // Add ConP and ConN null oop nodes
   Node* oop_null = igvn->zerocon(T_OBJECT);
   assert(oop_null->_idx < nodes_size(), "should be created already");
   add_java_object(oop_null, PointsToNode::NoEscape);
   null_obj = ptnode_adr(oop_null->_idx)->as_JavaObject();
-  set_not_scalar_replaceable(null_obj NOT_PRODUCT(COMMA "Null object"));
+  set_not_scalar_replaceable(null_obj, "Null object");
   if (UseCompressedOops) {
     Node* noop_null = igvn->zerocon(T_NARROWOOP);
     assert(noop_null->_idx < nodes_size(), "should be created already");
@@ -232,7 +232,6 @@ bool ConnectionGraph::compute_escape() {
     }
   }
 
-#ifndef PRODUCT
   if (_compile->directive()->TraceEscapeAnalysisOption) {
     tty->print("+++++ Initial worklist for ");
     _compile->method()->print_name();
@@ -243,7 +242,6 @@ bool ConnectionGraph::compute_escape() {
     }
     tty->print_cr("+++++ Calculating escape states and scalar replaceability");
   }
-#endif
 
   if (non_escaped_allocs_worklist.length() == 0) {
     _collecting = false;
@@ -359,11 +357,9 @@ bool ConnectionGraph::compute_escape() {
     optimize_ideal_graph(ptr_cmp_worklist, storestore_worklist);
   }
 
-#ifndef PRODUCT
   if (PrintEscapeAnalysis) {
     dump(ptnodes_worklist); // Dump ConnectionGraph
   }
-#endif
 
 #ifdef ASSERT
   if (VerifyConnectionGraph) {
@@ -1574,7 +1570,7 @@ void ConnectionGraph::add_node_to_connection_graph(Node *n, Unique_Node_List *de
         es = PointsToNode::GlobalEscape;
       }
       PointsToNode* ptn_con = add_java_object(n, es);
-      set_not_scalar_replaceable(ptn_con NOT_PRODUCT(COMMA "Constant pointer"));
+      set_not_scalar_replaceable(ptn_con, "Constant pointer");
       break;
     }
     case Op_CreateEx: {
@@ -1665,7 +1661,7 @@ void ConnectionGraph::add_node_to_connection_graph(Node *n, Unique_Node_List *de
     }
     case Op_ThreadLocal: {
       PointsToNode* ptn_thr = add_java_object(n, PointsToNode::ArgEscape);
-      set_not_scalar_replaceable(ptn_thr NOT_PRODUCT(COMMA "Constant pointer"));
+      set_not_scalar_replaceable(ptn_thr,"Constant pointer");
       break;
     }
     case Op_Blackhole: {
@@ -1848,7 +1844,7 @@ void ConnectionGraph::add_final_edges(Node *n) {
 
           PointsToNode* ptn = ptnode_adr(in->_idx);
           assert(ptn != nullptr, "should be defined already");
-          set_escape_state(ptn, PointsToNode::GlobalEscape NOT_PRODUCT(COMMA "blackhole"));
+          set_escape_state(ptn, PointsToNode::GlobalEscape,"blackhole");
           add_edge(n_ptn, ptn);
         }
       }
@@ -1933,7 +1929,7 @@ bool ConnectionGraph::add_final_edges_unsafe_access(Node* n, uint opcode) {
     Node* val = n->in(MemNode::ValueIn);
     PointsToNode* ptn = ptnode_adr(val->_idx);
     assert(ptn != nullptr, "node should be registered");
-    set_escape_state(ptn, PointsToNode::GlobalEscape NOT_PRODUCT(COMMA "stored at raw address"));
+    set_escape_state(ptn, PointsToNode::GlobalEscape, "stored at raw address");
     // Add edge to object for unsafe access with offset.
     PointsToNode* adr_ptn = ptnode_adr(adr->_idx);
     assert(adr_ptn != nullptr, "node should be registered");
@@ -1959,7 +1955,7 @@ void ConnectionGraph::add_call_node(CallNode* call) {
     assert(kt != nullptr, "TypeKlassPtr  required.");
     PointsToNode::EscapeState es = PointsToNode::NoEscape;
     bool scalar_replaceable = true;
-    NOT_PRODUCT(const char* nsr_reason = "");
+    const char* nsr_reason = "";
     if (call->is_AllocateArray()) {
       if (!kt->isa_aryklassptr()) { // StressReflectiveCode
         es = PointsToNode::GlobalEscape;
@@ -1968,11 +1964,11 @@ void ConnectionGraph::add_call_node(CallNode* call) {
         if (length < 0) {
           // Not scalar replaceable if the length is not constant.
           scalar_replaceable = false;
-          NOT_PRODUCT(nsr_reason = "has a non-constant length");
+          nsr_reason = "has a non-constant length";
         } else if (length > EliminateAllocationArraySizeLimit) {
           // Not scalar replaceable if the length is too big.
           scalar_replaceable = false;
-          NOT_PRODUCT(nsr_reason = "has a length that is too big");
+          nsr_reason = "has a length that is too big";
         }
       }
     } else {  // Allocate instance
@@ -1991,7 +1987,7 @@ void ConnectionGraph::add_call_node(CallNode* call) {
           if (nfields > EliminateAllocationFieldsLimit) {
             // Not scalar replaceable if there are too many fields.
             scalar_replaceable = false;
-            NOT_PRODUCT(nsr_reason = "has too many fields");
+            nsr_reason = "has too many fields";
           }
         }
       }
@@ -1999,7 +1995,7 @@ void ConnectionGraph::add_call_node(CallNode* call) {
     add_java_object(call, es);
     PointsToNode* ptn = ptnode_adr(call_idx);
     if (!scalar_replaceable && ptn->scalar_replaceable()) {
-      set_not_scalar_replaceable(ptn NOT_PRODUCT(COMMA nsr_reason));
+      set_not_scalar_replaceable(ptn,nsr_reason);
     }
   } else if (call->is_CallStaticJava()) {
     // Call nodes could be different types:
@@ -2030,7 +2026,7 @@ void ConnectionGraph::add_call_node(CallNode* call) {
       assert(strncmp(name, "_multianewarray", 15) == 0, "TODO: add failed case check");
       // Returns a newly allocated non-escaped object.
       add_java_object(call, PointsToNode::NoEscape);
-      set_not_scalar_replaceable(ptnode_adr(call_idx) NOT_PRODUCT(COMMA "is result of multinewarray"));
+      set_not_scalar_replaceable(ptnode_adr(call_idx), "is result of multinewarray");
     } else if (meth->is_boxing_method()) {
       // Returns boxing object
       PointsToNode::EscapeState es;
@@ -2044,7 +2040,7 @@ void ConnectionGraph::add_call_node(CallNode* call) {
       }
       add_java_object(call, es);
       if (es == PointsToNode::GlobalEscape) {
-        set_not_scalar_replaceable(ptnode_adr(call->_idx) NOT_PRODUCT(COMMA "object can be loaded from boxing cache"));
+        set_not_scalar_replaceable(ptnode_adr(call->_idx), "object can be loaded from boxing cache");
       }
     } else {
       BCEscapeAnalyzer* call_analyzer = meth->get_bcea();
@@ -2055,7 +2051,7 @@ void ConnectionGraph::add_call_node(CallNode* call) {
         // Mark it as NoEscape so that objects referenced by
         // it's fields will be marked as NoEscape at least.
         add_java_object(call, PointsToNode::NoEscape);
-        set_not_scalar_replaceable(ptnode_adr(call_idx) NOT_PRODUCT(COMMA "is result of call"));
+        set_not_scalar_replaceable(ptnode_adr(call_idx), "is result of call");
       } else {
         // Determine whether any arguments are returned.
         const TypeTuple* d = call->tf()->domain();
@@ -2217,7 +2213,7 @@ void ConnectionGraph::process_call_arguments(CallNode *call) {
               es = PointsToNode::NoEscape;
             }
           }
-          set_escape_state(arg_ptn, es NOT_PRODUCT(COMMA trace_arg_escape_message(call)));
+          set_escape_state(arg_ptn, es, trace_arg_escape_message(call));
           if (arg_is_arraycopy_dest) {
             Node* src = call->in(TypeFunc::Parms);
             if (src->is_AddP()) {
@@ -2272,12 +2268,12 @@ void ConnectionGraph::process_call_arguments(CallNode *call) {
               arg_ptn->escape_state() < PointsToNode::GlobalEscape) {
             if (!call_analyzer->is_arg_stack(k)) {
               // The argument global escapes
-              set_escape_state(arg_ptn, PointsToNode::GlobalEscape NOT_PRODUCT(COMMA trace_arg_escape_message(call)));
+              set_escape_state(arg_ptn, PointsToNode::GlobalEscape, trace_arg_escape_message(call));
             } else {
-              set_escape_state(arg_ptn, PointsToNode::ArgEscape NOT_PRODUCT(COMMA trace_arg_escape_message(call)));
+              set_escape_state(arg_ptn, PointsToNode::ArgEscape, trace_arg_escape_message(call));
               if (!call_analyzer->is_arg_local(k)) {
                 // The argument itself doesn't escape, but any fields might
-                set_fields_escape_state(arg_ptn, PointsToNode::GlobalEscape NOT_PRODUCT(COMMA trace_arg_escape_message(call)));
+                set_fields_escape_state(arg_ptn, PointsToNode::GlobalEscape, trace_arg_escape_message(call));
               }
             }
           }
@@ -2306,7 +2302,7 @@ void ConnectionGraph::process_call_arguments(CallNode *call) {
             arg = get_addp_base(arg);
           }
           assert(ptnode_adr(arg->_idx) != nullptr, "should be defined already");
-          set_escape_state(ptnode_adr(arg->_idx), PointsToNode::GlobalEscape NOT_PRODUCT(COMMA trace_arg_escape_message(call)));
+          set_escape_state(ptnode_adr(arg->_idx), PointsToNode::GlobalEscape, trace_arg_escape_message(call));
         }
       }
     }
@@ -2490,30 +2486,30 @@ bool ConnectionGraph::find_non_escaped_objects(GrowableArray<PointsToNode*>& ptn
         assert(ptn->arraycopy_dst(), "sanity");
         // Propagate only fields escape state through arraycopy edge.
         if (e->fields_escape_state() < field_es) {
-          set_fields_escape_state(e, field_es NOT_PRODUCT(COMMA trace_propagate_message(ptn)));
+          set_fields_escape_state(e, field_es, trace_propagate_message(ptn));
           escape_worklist.push(e);
         }
       } else if (es >= field_es) {
         // fields_escape_state is also set to 'es' if it is less than 'es'.
         if (e->escape_state() < es) {
-          set_escape_state(e, es NOT_PRODUCT(COMMA trace_propagate_message(ptn)));
+          set_escape_state(e, es, trace_propagate_message(ptn));
           escape_worklist.push(e);
         }
       } else {
         // Propagate field escape state.
         bool es_changed = false;
         if (e->fields_escape_state() < field_es) {
-          set_fields_escape_state(e, field_es NOT_PRODUCT(COMMA trace_propagate_message(ptn)));
+          set_fields_escape_state(e, field_es, trace_propagate_message(ptn));
           es_changed = true;
         }
         if ((e->escape_state() < field_es) &&
             e->is_Field() && ptn->is_JavaObject() &&
             e->as_Field()->is_oop()) {
           // Change escape state of referenced fields.
-          set_escape_state(e, field_es NOT_PRODUCT(COMMA trace_propagate_message(ptn)));
+          set_escape_state(e, field_es, trace_propagate_message(ptn));
           es_changed = true;
         } else if (e->escape_state() < es) {
-          set_escape_state(e, es NOT_PRODUCT(COMMA trace_propagate_message(ptn)));
+          set_escape_state(e, es, trace_propagate_message(ptn));
           es_changed = true;
         }
         if (es_changed) {
@@ -2887,7 +2883,7 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
       // 1. An object is not scalar replaceable if the field into which it is
       // stored has unknown offset (stored into unknown element of an array).
       if (field->offset() == Type::OffsetBot) {
-        set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "is stored at unknown offset"));
+        set_not_scalar_replaceable(jobj,"is stored at unknown offset");
         return;
       }
       for (BaseIterator i(field); i.has_next(); i.next()) {
@@ -2895,13 +2891,13 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
         // 2. An object is not scalar replaceable if the field into which it is
         // stored has multiple bases one of which is null.
         if ((base == null_obj) && (field->base_count() > 1)) {
-          set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "is stored into field with potentially null base"));
+          set_not_scalar_replaceable(jobj, "is stored into field with potentially null base");
           return;
         }
         // 2.5. An object is not scalar replaceable if the field into which it is
         // stored has NSR base.
         if (!base->scalar_replaceable()) {
-          set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "is stored into field with NSR base"));
+          set_not_scalar_replaceable(jobj, "is stored into field with NSR base");
           return;
         }
       }
@@ -2929,8 +2925,8 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
           candidates.push(use_n);
         } else {
           // Mark all objects as NSR if we can't remove the merge
-          set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA trace_merged_message(ptn)));
-          set_not_scalar_replaceable(ptn NOT_PRODUCT(COMMA trace_merged_message(jobj)));
+          set_not_scalar_replaceable(jobj, trace_merged_message(ptn));
+          set_not_scalar_replaceable(ptn, trace_merged_message(jobj));
         }
       }
     }
@@ -2951,7 +2947,7 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
     // 4. An object is not scalar replaceable if it has a field with unknown
     // offset (array's element is accessed in loop).
     if (offset == Type::OffsetBot) {
-      set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "has field with unknown offset"));
+      set_not_scalar_replaceable(jobj,"has field with unknown offset");
       return;
     }
     // 5. Currently an object is not scalar replaceable if a LoadStore node
@@ -2966,14 +2962,14 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
         n->in(AddPNode::Address)->Opcode() == Op_CheckCastPP) {
       assert(n->in(AddPNode::Address)->bottom_type()->isa_rawptr(), "raw address so raw cast expected");
       assert(_igvn->type(n->in(AddPNode::Address)->in(1))->isa_oopptr(), "cast pattern at unsafe access expected");
-      set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "is used as base of mixed unsafe access"));
+      set_not_scalar_replaceable(jobj, "is used as base of mixed unsafe access");
       return;
     }
 
     for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
       Node* u = n->fast_out(i);
       if (u->is_LoadStore() || (u->is_Mem() && u->as_Mem()->is_mismatched_access())) {
-        set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "is used in LoadStore or mismatched access"));
+        set_not_scalar_replaceable(jobj, "is used in LoadStore or mismatched access");
         return;
       }
     }
@@ -3003,8 +2999,8 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
           // this field's base by now.
           if (base->is_JavaObject() && base != jobj) {
             // Mark all bases.
-            set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "may point to more than one object"));
-            set_not_scalar_replaceable(base NOT_PRODUCT(COMMA "may point to more than one object"));
+            set_not_scalar_replaceable(jobj,"may point to more than one object");
+            set_not_scalar_replaceable(base,"may point to more than one object");
           }
         }
 
@@ -3056,7 +3052,7 @@ void ConnectionGraph::find_scalar_replaceable_allocs(GrowableArray<JavaObjectNod
             // An object is not scalar replaceable if the field into which
             // it is stored has NSR base.
             if ((base != null_obj) && !base->scalar_replaceable()) {
-              set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "is stored into field with NSR base"));
+              set_not_scalar_replaceable(jobj, "is stored into field with NSR base");
               found_nsr_alloc = true;
               break;
             }
@@ -4351,7 +4347,7 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
         // so it could be eliminated.
         alloc->as_Allocate()->_is_scalar_replaceable = true;
       }
-      set_escape_state(ptnode_adr(n->_idx), es NOT_PRODUCT(COMMA trace_propagate_message(ptn))); // CheckCastPP escape state
+      set_escape_state(ptnode_adr(n->_idx), es, trace_propagate_message(ptn)); // CheckCastPP escape state
       // in order for an object to be scalar-replaceable, it must be:
       //   - a direct allocation (not a call returning an object)
       //   - non-escaping
@@ -4863,7 +4859,6 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
 #endif
 }
 
-#ifndef PRODUCT
 int ConnectionGraph::_no_escape_counter = 0;
 int ConnectionGraph::_arg_escape_counter = 0;
 int ConnectionGraph::_global_escape_counter = 0;
@@ -4932,7 +4927,7 @@ void PointsToNode::dump(bool print_state, outputStream* out, bool newline) const
   if (_node == nullptr) {
     out->print("<null>%s", newline ? "\n" : "");
   } else {
-    _node->dump(newline ? "\n" : "", false, out);
+    out->print("%d %s%s", _node->_idx, NodeClassNames[_node->Opcode()], newline ? "\n" : "");
   }
 }
 
@@ -5025,8 +5020,7 @@ const char* ConnectionGraph::trace_propagate_message(PointsToNode* from) const {
 const char* ConnectionGraph::trace_arg_escape_message(CallNode* call) const {
   if (_compile->directive()->TraceEscapeAnalysisOption) {
     stringStream ss;
-    ss.print("escapes as arg to:");
-    call->dump("", false, &ss);
+    ss.print("escapes as arg to: %d %s\n", call->_idx, NodeClassNames[call->Opcode()]);
     return ss.as_string();
   } else {
     return nullptr;
@@ -5043,8 +5037,6 @@ const char* ConnectionGraph::trace_merged_message(PointsToNode* other) const {
     return nullptr;
   }
 }
-
-#endif
 
 void ConnectionGraph::record_for_optimizer(Node *n) {
   _igvn->_worklist.push(n);

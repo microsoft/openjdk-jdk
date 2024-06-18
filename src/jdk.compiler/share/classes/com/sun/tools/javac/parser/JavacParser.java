@@ -1277,8 +1277,8 @@ public class JavacParser implements Parser {
         protected JCExpression foldStrings(JCExpression tree) {
             if (!allowStringFolding)
                 return tree;
-            ListBuffer<JCExpression> opStack = new ListBuffer<>();
-            ListBuffer<JCLiteral> litBuf = new ListBuffer<>();
+            ListBuffer<JCExpression> opStack = new ListBuffer<>(); // bci == 9
+            ListBuffer<JCLiteral> litBuf = new ListBuffer<>();  // bci == 17
             boolean needsFolding = false;
             JCExpression curr = tree;
             while (true) {

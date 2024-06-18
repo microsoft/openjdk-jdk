@@ -83,7 +83,8 @@ class methodHandle;
   option(TraceOptoPipelining, "TraceOptoPipelining", Bool) \
   option(TraceOptoOutput, "TraceOptoOutput", Bool) \
   option(TraceSpilling, "TraceSpilling", Bool) \
-NOT_PRODUCT(option(TraceEscapeAnalysis, "TraceEscapeAnalysis", Bool)) \
+  option(PrintMethodData, "PrintMethodData", Bool) \
+  option(TraceEscapeAnalysis, "TraceEscapeAnalysis", Bool) \
 NOT_PRODUCT(option(PrintIdeal, "PrintIdeal", Bool))  \
 NOT_PRODUCT(option(PrintIdealPhase, "PrintIdealPhase", Ccstrlist)) \
 NOT_PRODUCT(option(IGVPrintLevel, "IGVPrintLevel", Intx)) \

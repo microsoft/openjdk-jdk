@@ -231,12 +231,9 @@ public:
   // Return true if one node points to an other.
   bool meet(PointsToNode* ptn);
 
-#ifndef PRODUCT
   NodeType node_type() const { return (NodeType)_type;}
   void dump(bool print_state=true, outputStream* out=tty, bool newline=true) const;
   void dump_header(bool print_state=true, outputStream* out=tty) const;
-#endif
-
 };
 
 class LocalVarNode: public PointsToNode {
@@ -431,16 +428,16 @@ private:
   int find_init_values_phantom(JavaObjectNode* ptn);
 
   // Set the escape state of an object and its fields.
-  void set_escape_state(PointsToNode* ptn, PointsToNode::EscapeState esc
-                        NOT_PRODUCT(COMMA const char* reason)) {
+  void set_escape_state(PointsToNode* ptn, PointsToNode::EscapeState esc,
+                        const char* reason) {
     // Don't change non-escaping state of null pointer.
     if (ptn != null_obj) {
       if (ptn->escape_state() < esc) {
-        NOT_PRODUCT(trace_es_update_helper(ptn, esc, false, reason));
+        trace_es_update_helper(ptn, esc, false, reason);
         ptn->set_escape_state(esc);
       }
       if (ptn->fields_escape_state() < esc) {
-        NOT_PRODUCT(trace_es_update_helper(ptn, esc, true, reason));
+        trace_es_update_helper(ptn, esc, true, reason);
         ptn->set_fields_escape_state(esc);
       }
 
@@ -449,12 +446,12 @@ private:
       }
     }
   }
-  void set_fields_escape_state(PointsToNode* ptn, PointsToNode::EscapeState esc
-                               NOT_PRODUCT(COMMA const char* reason)) {
+  void set_fields_escape_state(PointsToNode* ptn, PointsToNode::EscapeState esc,
+                               const char* reason) {
     // Don't change non-escaping state of null pointer.
     if (ptn != null_obj) {
       if (ptn->fields_escape_state() < esc) {
-        NOT_PRODUCT(trace_es_update_helper(ptn, esc, true, reason));
+        trace_es_update_helper(ptn, esc, true, reason);
         ptn->set_fields_escape_state(esc);
       }
 
@@ -612,23 +609,19 @@ private:
   bool reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints);
   void reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
 
-  void set_not_scalar_replaceable(PointsToNode* ptn NOT_PRODUCT(COMMA const char* reason)) const {
-#ifndef PRODUCT
+  void set_not_scalar_replaceable(PointsToNode* ptn, const char* reason) const {
     if (_compile->directive()->TraceEscapeAnalysisOption) {
       assert(ptn != nullptr, "should not be null");
       ptn->dump_header(true);
       tty->print_cr("is NSR. %s", reason);
     }
-#endif
     ptn->set_scalar_replaceable(false);
   }
 
-#ifndef PRODUCT
   void trace_es_update_helper(PointsToNode* ptn, PointsToNode::EscapeState es, bool fields, const char* reason) const;
   const char* trace_propagate_message(PointsToNode* from) const;
   const char* trace_arg_escape_message(CallNode* call) const;
   const char* trace_merged_message(PointsToNode* other) const;
-#endif
 
 public:
   ConnectionGraph(Compile *C, PhaseIterGVN *igvn, int iteration);
@@ -677,14 +670,12 @@ public:
   void add_to_congraph_unsafe_access(Node* n, uint opcode, Unique_Node_List* delayed_worklist);
   bool add_final_edges_unsafe_access(Node* n, uint opcode);
 
-#ifndef PRODUCT
   static int _no_escape_counter;
   static int _arg_escape_counter;
   static int _global_escape_counter;
   void dump(GrowableArray<PointsToNode*>& ptnodes_worklist);
   static void print_statistics();
   void escape_state_statistics(GrowableArray<JavaObjectNode*>& java_objects_worklist);
-#endif
 };
 
 inline PointsToNode::PointsToNode(ConnectionGraph *CG, Node* n, EscapeState es, NodeType type):

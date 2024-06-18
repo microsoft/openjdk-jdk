@@ -193,7 +193,7 @@
           "Back edge threshold at which tier 3 OSR compilation is invoked") \
           range(0, max_jint)                                                \
                                                                             \
-  product(intx, Tier4InvocationThreshold, 5000,                             \
+  product(intx, Tier4InvocationThreshold, 2000,                             \
           "Compile if number of method invocations crosses this "           \
           "threshold")                                                      \
           range(0, max_jint)                                                \
@@ -202,7 +202,7 @@
           "Minimum invocation to compile at tier 4")                        \
           range(0, max_jint)                                                \
                                                                             \
-  product(intx, Tier4CompileThreshold, 15000,                               \
+  product(intx, Tier4CompileThreshold, 5000,                                \
           "Threshold at which tier 4 compilation is invoked (invocation "   \
           "minimum must be satisfied)")                                     \
           range(0, max_jint)                                                \

@@ -119,8 +119,7 @@ static void collect_profiled_methods(Method* m) {
 }
 
 static void print_method_profiling_data() {
-  if ((ProfileInterpreter COMPILER1_PRESENT(|| C1UpdateMethodData)) &&
-     (PrintMethodData || CompilerOracle::should_print_methods())) {
+  if (CountCompiledCalls) {
     ResourceMark rm;
     collected_profiled_methods = new GrowableArray<Method*>(1024);
     SystemDictionary::methods_do(collect_profiled_methods);
@@ -157,8 +156,6 @@ static void print_method_profiling_data() {
 }
 
 
-#ifndef PRODUCT
-
 // Statistics printing (method invocation histogram)
 
 GrowableArray<Method*>* collected_invoked_methods;
@@ -174,57 +171,59 @@ static void collect_invoked_methods(Method* m) {
 // overflow border. Longer-running workloads tend to create invocation
 // counts which already overflow 32-bit counters for individual methods.
 static void print_method_invocation_histogram() {
-  ResourceMark rm;
-  collected_invoked_methods = new GrowableArray<Method*>(1024);
-  SystemDictionary::methods_do(collect_invoked_methods);
-  collected_invoked_methods->sort(&compare_methods);
-  //
-  tty->cr();
-  tty->print_cr("Histogram Over Method Invocation Counters (cutoff = " INTX_FORMAT "):", MethodHistogramCutoff);
-  tty->cr();
-  tty->print_cr("____Count_(I+C)____Method________________________Module_________________");
-  uint64_t total        = 0,
-           int_total    = 0,
-           comp_total   = 0,
-           special_total= 0,
-           static_total = 0,
-           final_total  = 0,
-           synch_total  = 0,
-           native_total = 0,
-           access_total = 0;
-  for (int index = 0; index < collected_invoked_methods->length(); index++) {
-    // Counter values returned from getter methods are signed int.
-    // To shift the overflow border by a factor of two, we interpret
-    // them here as unsigned long. A counter can't be negative anyway.
-    Method* m = collected_invoked_methods->at(index);
-    uint64_t iic = (uint64_t)m->invocation_count();
-    uint64_t cic = (uint64_t)m->compiled_invocation_count();
-    if ((iic + cic) >= (uint64_t)MethodHistogramCutoff) m->print_invocation_count(tty);
-    int_total  += iic;
-    comp_total += cic;
-    if (m->is_final())        final_total  += iic + cic;
-    if (m->is_static())       static_total += iic + cic;
-    if (m->is_synchronized()) synch_total  += iic + cic;
-    if (m->is_native())       native_total += iic + cic;
-    if (m->is_accessor())     access_total += iic + cic;
+  if (CountCompiledCalls) {
+    ResourceMark rm;
+    collected_invoked_methods = new GrowableArray<Method*>(1024);
+    SystemDictionary::methods_do(collect_invoked_methods);
+    collected_invoked_methods->sort(&compare_methods);
+    //
+    tty->cr();
+    tty->print_cr("Histogram Over Method Invocation Counters (cutoff = " INTX_FORMAT "):", MethodHistogramCutoff);
+    tty->cr();
+    tty->print_cr("____Count_(I+C)____Method________________________Module_________________");
+    uint64_t total        = 0,
+            int_total    = 0,
+            comp_total   = 0,
+            special_total= 0,
+            static_total = 0,
+            final_total  = 0,
+            synch_total  = 0,
+            native_total = 0,
+            access_total = 0;
+    for (int index = 0; index < collected_invoked_methods->length(); index++) {
+      // Counter values returned from getter methods are signed int.
+      // To shift the overflow border by a factor of two, we interpret
+      // them here as unsigned long. A counter can't be negative anyway.
+      Method* m = collected_invoked_methods->at(index);
+      uint64_t iic = (uint64_t)m->invocation_count();
+      uint64_t cic = (uint64_t)m->compiled_invocation_count();
+      if ((iic + cic) >= (uint64_t)MethodHistogramCutoff) m->print_invocation_count(tty);
+      int_total  += iic;
+      comp_total += cic;
+      if (m->is_final())        final_total  += iic + cic;
+      if (m->is_static())       static_total += iic + cic;
+      if (m->is_synchronized()) synch_total  += iic + cic;
+      if (m->is_native())       native_total += iic + cic;
+      if (m->is_accessor())     access_total += iic + cic;
+    }
+    tty->cr();
+    total = int_total + comp_total;
+    special_total = final_total + static_total +synch_total + native_total + access_total;
+    tty->print_cr("Invocations summary for %d methods:", collected_invoked_methods->length());
+    double total_div = (double)total;
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (100%%)  total",           total);
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%) |- interpreted", int_total,     100.0 * (double)int_total    / total_div);
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%) |- compiled",    comp_total,    100.0 * (double)comp_total   / total_div);
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%) |- special methods (interpreted and compiled)",
+                                                                          special_total, 100.0 * (double)special_total/ total_div);
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- synchronized",synch_total,   100.0 * (double)synch_total  / total_div);
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- final",       final_total,   100.0 * (double)final_total  / total_div);
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- static",      static_total,  100.0 * (double)static_total / total_div);
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- native",      native_total,  100.0 * (double)native_total / total_div);
+    tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- accessor",    access_total,  100.0 * (double)access_total / total_div);
+    tty->cr();
+    //SharedRuntime::print_call_statistics(comp_total);
   }
-  tty->cr();
-  total = int_total + comp_total;
-  special_total = final_total + static_total +synch_total + native_total + access_total;
-  tty->print_cr("Invocations summary for %d methods:", collected_invoked_methods->length());
-  double total_div = (double)total;
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (100%%)  total",           total);
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%) |- interpreted", int_total,     100.0 * (double)int_total    / total_div);
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%) |- compiled",    comp_total,    100.0 * (double)comp_total   / total_div);
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%) |- special methods (interpreted and compiled)",
-                                                                         special_total, 100.0 * (double)special_total/ total_div);
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- synchronized",synch_total,   100.0 * (double)synch_total  / total_div);
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- final",       final_total,   100.0 * (double)final_total  / total_div);
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- static",      static_total,  100.0 * (double)static_total / total_div);
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- native",      native_total,  100.0 * (double)native_total / total_div);
-  tty->print_cr("\t" UINT64_FORMAT_W(12) " (%4.1f%%)    |- accessor",    access_total,  100.0 * (double)access_total / total_div);
-  tty->cr();
-  SharedRuntime::print_call_statistics(comp_total);
 }
 
 static void print_bytecode_count() {
@@ -233,12 +232,6 @@ static void print_bytecode_count() {
   }
 }
 
-#else
-
-static void print_method_invocation_histogram() {}
-static void print_bytecode_count() {}
-
-#endif // PRODUCT
 
 
 // General statistics printing (profiling ...)
@@ -288,10 +281,8 @@ void print_statistics() {
   if (PrintNMethodStatistics) {
     nmethod::print_statistics();
   }
-  if (CountCompiledCalls) {
-    print_method_invocation_histogram();
-  }
 
+  print_method_invocation_histogram();
   print_method_profiling_data();
 
   if (TimeOopMap) {

@@ -418,7 +418,7 @@
                                                                             \
   /* controls for heat-based inlining */                                    \
                                                                             \
-  develop(intx, NodeCountInliningCutoff, 18000,                             \
+  develop(intx, NodeCountInliningCutoff, 40000,                             \
           "If parser node generation exceeds limit stop inlining")          \
           range(0, max_jint)                                                \
                                                                             \

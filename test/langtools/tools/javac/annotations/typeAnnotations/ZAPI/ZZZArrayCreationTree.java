@@ -50,29 +50,608 @@ import javax.tools.StandardJavaFileManager;
 
 public class ZZZArrayCreationTree {
     public static void main(String[] args) throws Exception {
-	for (int i=0; i<16000; i++) {
-		just_do_it();
-	}
-    }
-
-    public static void just_do_it() throws Exception {
-        PrintWriter out = new PrintWriter(System.out, true);
+	PrintWriter out = new PrintWriter(System.out, true);
         JavacTool tool = JavacTool.create();
-        try (StandardJavaFileManager fm = tool.getStandardFileManager(null, null, null)) {
-            File testSrc = new File(System.getProperty("test.src"));
-            Iterable<? extends JavaFileObject> f =
-                fm.getJavaFileObjectsFromFiles(Arrays.asList(new File(testSrc, "ZZZArrayCreationTree.java")));
-            JavacTask task = tool.getTask(out, fm, null, null, null, f);
-            Iterable<? extends CompilationUnitTree> trees = task.parse();
-            out.flush();
+        File testSrc   = new File(System.getProperty("test.src"));
+        StandardJavaFileManager fm = tool.getStandardFileManager(null, null, null);
+        Iterable<? extends JavaFileObject> f = fm.getJavaFileObjectsFromFiles(Arrays.asList(new File(testSrc, "ZZZArrayCreationTree.java")));
 
-            Scanner s = new Scanner();
-            for (CompilationUnitTree t: trees)
-                s.scan(t, null);
+        for (int i=0; i<100000; i++) {
+            tool.getTask(out, fm, null, null, null, f).parse();
         }
     }
 
     private static class Scanner extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }
+
+    private static class Scanner2 extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }private static class Scanner3 extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }private static class Scanner4 extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }
+    
+    private static class Scanner5 extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }
+
+    private static class Scanner6 extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }    
+    
+    private static class Scanner7 extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }    
+    
+    private static class Scanner8 extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }    
+    
+    private static class Scanner9 extends TreeScanner<Void,Void> {
+        int foundAnnotations = 0;
+        public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
+            super.visitCompilationUnit(node, ignore);
+            if (foundAnnotations != expectedAnnotations) {
+                throw new AssertionError("Expected " + expectedAnnotations +
+                        " annotations but found: " + foundAnnotations);
+            }
+            return null;
+        }
+
+        private void testAnnotations(List<? extends AnnotationTree> annos, int found) {
+            if (annos.isEmpty()) return;
+
+            String annotation = annos.get(0).toString();
+            foundAnnotations++;
+
+            int expected = -1;
+            if (annotation.equals("@A"))
+                expected = 0;
+            else if (annotation.equals("@B"))
+                expected = 1;
+            else if (annotation.equals("@C"))
+                expected = 2;
+            else
+                throw new AssertionError("found an unexpected annotation: " + annotation);
+            if (found != expected) {
+                throw new AssertionError("Unexpected found length" +
+                    ", found " + found + " but expected " + expected);
+            }
+        }
+
+        public Void visitAnnotatedType(AnnotatedTypeTree node, Void ignore) {
+            testAnnotations(node.getAnnotations(), arrayLength(node));
+            return super.visitAnnotatedType(node, ignore);
+        }
+
+        public Void visitNewArray(NewArrayTree node, Void ignore) {
+            // the Tree API hasn't been updated to expose annotations yet
+            JCNewArray newArray = (JCNewArray)node;
+            int totalLength = node.getDimensions().size()
+                                + arrayLength(node.getType())
+                                + ((newArray.getInitializers() != null) ? 1 : 0);
+            testAnnotations(newArray.annotations, totalLength);
+            int count = 0;
+            for (List<? extends AnnotationTree> annos : newArray.dimAnnotations) {
+                testAnnotations(annos, totalLength - count);
+                count++;
+            }
+            return super.visitNewArray(node, ignore);
+        }
+
+        private int arrayLength(Tree tree) {
+            // TODO: the tree is null when called with node.getType(). Why?
+            if (tree==null) return -1;
+            switch (tree.getKind()) {
+            case ARRAY_TYPE:
+                return 1 + arrayLength(((ArrayTypeTree)tree).getType());
+            case ANNOTATED_TYPE:
+                return arrayLength(((AnnotatedTypeTree)tree).getUnderlyingType());
+            default:
+                return 0;
+            }
+        }
+    }    
+    
+    private static class Scanner10 extends TreeScanner<Void,Void> {
         int foundAnnotations = 0;
         public Void visitCompilationUnit(CompilationUnitTree node, Void ignore) {
             super.visitCompilationUnit(node, ignore);
