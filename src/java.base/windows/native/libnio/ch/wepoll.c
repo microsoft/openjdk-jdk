@@ -64,6 +64,7 @@
 #endif
 
 #include <stdint.h>
+#include <synchapi.h>
 
 enum EPOLL_EVENTS {
   EPOLLIN      = (int) (1U <<  0),
@@ -513,7 +514,6 @@ typedef struct reflock {
   volatile long state; /* 32-bit Interlocked APIs operate on `long` values. */
 } reflock_t;
 
-WEPOLL_INTERNAL int reflock_global_init(void);
 
 WEPOLL_INTERNAL void reflock_init(reflock_t* reflock);
 WEPOLL_INTERNAL void reflock_ref(reflock_t* reflock);
@@ -878,7 +878,7 @@ static BOOL CALLBACK init__once_callback(INIT_ONCE* once,
 
   /* N.b. that initialization order matters here. */
   if (ws_global_init() < 0 || nt_global_init() < 0 ||
-      reflock_global_init() < 0 || epoll_global_init() < 0)
+      epoll_global_init() < 0)
     return FALSE;
 
   init__done = true;
@@ -1553,30 +1553,18 @@ bool queue_is_enqueued(const queue_node_t* node) {
 #define REFLOCK__DESTROY_MASK ((long) 0xf0000000UL)
 #define REFLOCK__POISON       ((long) 0x300dead0UL)
 
-static HANDLE reflock__keyed_event = NULL;
-
-int reflock_global_init(void) {
-  NTSTATUS status = NtCreateKeyedEvent(
-      &reflock__keyed_event, KEYEDEVENT_ALL_ACCESS, NULL, 0);
-  if (status != STATUS_SUCCESS)
-    return_set_error(-1, RtlNtStatusToDosError(status));
-  return 0;
-}
 
 void reflock_init(reflock_t* reflock) {
   reflock->state = 0;
 }
 
 static void reflock__signal_event(void* address) {
-  NTSTATUS status =
-      NtReleaseKeyedEvent(reflock__keyed_event, address, FALSE, NULL);
-  if (status != STATUS_SUCCESS)
-    abort();
+  WakeByAddressSingle(address);
 }
 
 static void reflock__await_event(void* address) {
   NTSTATUS status =
-      NtWaitForKeyedEvent(reflock__keyed_event, address, FALSE, NULL);
+      WaitOnAddress(address, 0, sizeof(long), INFINITE);
   if (status != STATUS_SUCCESS)
     abort();
 }
