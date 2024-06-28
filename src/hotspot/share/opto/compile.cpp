@@ -2234,6 +2234,7 @@ void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
       (strstr(method()->holder()->name()->as_utf8(), "JavacParser") != nullptr && strcmp(method()->name()->as_utf8(), "term") == 0) ||
       (strstr(method()->holder()->name()->as_utf8(), "ListBuffer")  != nullptr && strcmp(method()->name()->as_utf8(), "first") == 0)
      ) {
+    const char* name = method()->name()->as_utf8();
     Unique_Node_List wq;
     wq.push(root());
     stringStream graph;
@@ -2255,11 +2256,11 @@ void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
       for (DUIterator_Fast jmax, j = n->fast_outs(jmax); j < jmax; j++) {
         Node* u = n->fast_out(j);
         if (u != nullptr) {
-          if (u->is_Call() && !u->as_Call()->has_non_debug_use(n)) {
-            // skip if this call is only using the node because of debug info
-            // this should also cover cases where 'u' is a trap
-            continue;
-          }
+        //  if (u->is_Call() && !u->as_Call()->has_non_debug_use(n)) {
+        //    // skip if this call is only using the node because of debug info
+        //    // this should also cover cases where 'u' is a trap
+        //    continue;
+        //  }
           graph.print(" %d", u->_idx);
           wq.push(u);
         }
@@ -2301,7 +2302,7 @@ void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
     }
 
     stringStream filename;
-    filename.print("/tmp/graph_%d_%d_%s.ir", compile_id(), _graph_counter++, label);
+    filename.print("/tmp/graph_%s_%d_%d_%s.ir", name, compile_id(), _graph_counter++, label);
 
     fileStream fs(filename.freeze());
     fs.print("%s", graph.freeze());
