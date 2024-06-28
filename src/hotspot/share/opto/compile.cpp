@@ -2228,6 +2228,10 @@ void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
   if ((strstr(method()->holder()->name()->as_utf8(), "JavacParser") != nullptr && strcmp(method()->name()->as_utf8(), "merge") == 0) ||
       (strstr(method()->holder()->name()->as_utf8(), "JavacParser") != nullptr && strcmp(method()->name()->as_utf8(), "foldIfNeeded") == 0) ||
       (strstr(method()->holder()->name()->as_utf8(), "JavacParser") != nullptr && strcmp(method()->name()->as_utf8(), "foldStrings") == 0) ||
+      (strstr(method()->holder()->name()->as_utf8(), "JavacParser") != nullptr && strcmp(method()->name()->as_utf8(), "term2Rest") == 0) ||
+      (strstr(method()->holder()->name()->as_utf8(), "JavacParser") != nullptr && strcmp(method()->name()->as_utf8(), "term2") == 0) ||
+      (strstr(method()->holder()->name()->as_utf8(), "JavacParser") != nullptr && strcmp(method()->name()->as_utf8(), "term1") == 0) ||
+      (strstr(method()->holder()->name()->as_utf8(), "JavacParser") != nullptr && strcmp(method()->name()->as_utf8(), "term") == 0) ||
       (strstr(method()->holder()->name()->as_utf8(), "ListBuffer")  != nullptr && strcmp(method()->name()->as_utf8(), "first") == 0)
      ) {
     Unique_Node_List wq;
