@@ -2281,15 +2281,19 @@ void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
           graph.print("jvms bci='%d' line='%d' method='%s' <= ", p->bci(), p->method()->line_number_from_bci(p->bci()), p->method()->name()->as_utf8());
           p = p->caller();
         }
-      } else if (n->is_Con()) {
-        const Type* t = n->as_Type()->type();
-
-        if (t->base() == Type::Int) {
-          const TypeInt* ti = t->is_int();
-          graph.print(" ## %d", ti->get_con());
-        } else if (t->base() == Type::Long) {
-          const TypeLong* tl = t->is_long();
-          graph.print(" ## %ld", tl->get_con());
+      } else if (n->is_SafePointScalarObject()) {
+        graph.print(" ## ");
+        SafePointScalarObjectNode* spso = n->as_SafePointScalarObject();
+        if (spso->outcnt() > 0) {
+          CallNode* call = spso->raw_out(0)->as_Call();
+          graph.print("first_index=%d", spso->first_index(call->jvms()));
+        }
+      } else if (n->is_SafePointScalarMerge()) {
+        graph.print(" ## ");
+        SafePointScalarMergeNode* spso = n->as_SafePointScalarMerge();
+        if (spso->outcnt() > 0) { 
+          CallNode* call = spso->raw_out(0)->as_Call();
+          graph.print("merge_ptr_idx=%d selector_idx=%d", spso->merge_pointer_idx(call->jvms()), spso->selector_idx(call->jvms()));
         }
       }
 
