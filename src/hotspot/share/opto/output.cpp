@@ -56,6 +56,7 @@
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
 #include "utilities/xmlstream.hpp"
+#include "utilities/ostream.hpp"
 
 #ifndef PRODUCT
 #define DEBUG_ARG(x) , x
@@ -1020,6 +1021,8 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
   // arrays) to descriptions of the object state.
   GrowableArray<ScopeValue*> *objs = new GrowableArray<ScopeValue*>();
 
+  stringStream st;
+
   // Visit scopes from oldest to youngest.
   for (int depth = 1; depth <= max_depth; depth++) {
     JVMState* jvms = youngest_jvms->of_depth(depth);
@@ -1045,6 +1048,15 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
     GrowableArray<ScopeValue*> *exparray = new GrowableArray<ScopeValue*>(num_exps);
     for( idx = 0; idx < num_exps; idx++ ) {
       FillLocArray( idx,  sfn, sfn->stack(jvms, idx), exparray, objs );
+    }
+
+    bool should_print = (method != nullptr && method->name() != nullptr && strcmp(method->name()->as_utf8(), "term2Rest") == 0);
+    if (should_print) {
+      st.print_cr("LocArray BEFORE:");
+      for (int i = 0; i < locarray->length(); i++) {
+        ScopeValue* sv = locarray->at(i);
+        sv->print_on(&st);
+      }
     }
 
     // Add in mappings of the monitors
@@ -1138,10 +1150,32 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
         for (int j = 0; j< merge->possible_objects()->length(); j++) {
           ObjectValue* ov = merge->possible_objects()->at(j)->as_ObjectValue();
           bool is_root = locarray->contains(ov) || exparray->contains(ov) || contains_as_owner(monarray, ov);
+          if (should_print && ov->is_root() && !is_root) {
+            st.print_cr("********** Changing ov (%d) from ROOT to NON-ROOT", ov->id());
+          }
           ov->set_root(is_root);
         }
       }
     }
+
+    if (should_print) {
+      st.print_cr("LocArray AFTER:");
+      for (int i = 0; i < locarray->length(); i++) {
+        ScopeValue* sv = locarray->at(i);
+        sv->print_on(&st);
+      }
+
+
+      static int print_counter = 0;
+      stringStream filename;
+      filename.print("/tmp/locarray_term2Rest_%d_%d.scp", C->compile_id(), print_counter++);
+      fileStream fs(filename.freeze());
+
+      fs.print("%s", st.freeze());
+      fs.flush();
+      fs.close();
+    }
+
 
     // We dump the object pool first, since deoptimization reads it in first.
     C->debug_info()->dump_object_pool(objs);
