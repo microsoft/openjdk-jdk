@@ -189,7 +189,7 @@ void ObjectValue::write_on(DebugInfoWriteStream* stream) {
 }
 
 void ObjectValue::print_on(outputStream* st) const {
-  st->print("%s[%d]", is_auto_box() ? "box_obj" : is_object_merge() ? "merge_obj" : "obj", _id);
+  st->print("%s[%d] is_root=%d", is_auto_box() ? "box_obj" : is_object_merge() ? "merge_obj" : "obj", _id, _is_root);
 }
 
 void ObjectValue::print_fields_on(outputStream* st) const {

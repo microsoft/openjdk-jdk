@@ -1050,18 +1050,19 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
       FillLocArray( idx,  sfn, sfn->stack(jvms, idx), exparray, objs );
     }
 
-    bool should_print = (method != nullptr && method->name() != nullptr && strcmp(method->name()->as_utf8(), "term2Rest") == 0);
+    bool should_print = (method != nullptr && method->name() != nullptr && strcmp(method->name()->as_utf8(), "test") == 0);
     if (should_print) {
       st.print_cr("LocArray BEFORE:");
       for (int i = 0; i < locarray->length(); i++) {
-        ScopeValue* sv = locarray->at(i);
-        if (sv->is_object()) {
-          sv->as_ObjectValue()->print_on(&st);
-        } else if (sv->is_object_merge()) {
-          sv->as_ObjectMergeValue()->print_on(&st);
-        } else {
-          sv->print_on(&st);
-        }
+        if (!locarray->at(i)->is_object() && !locarray->at(i)->is_object_merge()) continue;
+        locarray->at(i)->print_on(&st);
+        st.cr();
+      }
+      st.print_cr("------------------");
+      st.print_cr("ExpArray BEFORE:");
+      for (int i = 0; i < exparray->length(); i++) {
+        if (!exparray->at(i)->is_object() && !exparray->at(i)->is_object_merge()) continue;
+        exparray->at(i)->print_on(&st);
         st.cr();
       }
     }
@@ -1166,13 +1167,28 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
     }
 
     if (should_print) {
+      st.cr();
       st.print_cr("LocArray AFTER:");
       for (int i = 0; i < locarray->length(); i++) {
-        ScopeValue* sv = locarray->at(i);
-        sv->print_on(&st);
+        if (!locarray->at(i)->is_object() && !locarray->at(i)->is_object_merge()) continue;
+        locarray->at(i)->print_on(&st);
         st.cr();
       }
       st.print_cr("------------------");
+      st.print_cr("ExpArray AFTER:");
+      for (int i = 0; i < exparray->length(); i++) {
+        if (!exparray->at(i)->is_object() && !exparray->at(i)->is_object_merge()) continue;
+        exparray->at(i)->print_on(&st);
+        st.cr();
+      }
+      st.print_cr("------------------");
+      st.print_cr("MonArray AFTER:");
+      for (int i = 0; i < monarray->length(); i++) {
+        monarray->at(i)->print_on(&st);
+        st.cr();
+      }
+
+      st.cr(); st.cr(); st.cr(); st.cr();
     }
 
 
