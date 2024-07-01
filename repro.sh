@@ -10,6 +10,8 @@ done
 # move all graphs to new /tmp/old folder
 mkdir /tmp/old
 mv -f /tmp/graph_* /tmp/old/ 2>/dev/null
+mv -f /tmp/locarray_* /tmp/old/ 2>/dev/null
+mv -f /tmp/scopes_* /tmp/old/ 2>/dev/null
 
 # EXECUTE ONLY THE TEST
 #  make test CONF=release TEST=test/langtools/tools/javac/annotations/typeAnnotations/ZAPI/ZZZArrayCreationTree.java JTREG="TIMEOUT_FACTOR=100;JAVA_OPTIONS=${OPTS}"

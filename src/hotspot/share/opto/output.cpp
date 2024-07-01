@@ -1055,7 +1055,14 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
       st.print_cr("LocArray BEFORE:");
       for (int i = 0; i < locarray->length(); i++) {
         ScopeValue* sv = locarray->at(i);
-        sv->print_on(&st);
+        if (sv->is_object()) {
+          sv->as_ObjectValue()->print_on(&st);
+        } else if (sv->is_object_merge()) {
+          sv->as_ObjectMergeValue()->print_on(&st);
+        } else {
+          sv->print_on(&st);
+        }
+        st.cr();
       }
     }
 
@@ -1163,17 +1170,9 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
       for (int i = 0; i < locarray->length(); i++) {
         ScopeValue* sv = locarray->at(i);
         sv->print_on(&st);
+        st.cr();
       }
-
-
-      static int print_counter = 0;
-      stringStream filename;
-      filename.print("/tmp/locarray_term2Rest_%d_%d.scp", C->compile_id(), print_counter++);
-      fileStream fs(filename.freeze());
-
-      fs.print("%s", st.freeze());
-      fs.flush();
-      fs.close();
+      st.print_cr("------------------");
     }
 
 
@@ -1209,6 +1208,17 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
       monvals
     );
   } // End jvms loop
+
+  if (st.size() > 0) {
+    static int print_counter = 0;
+    stringStream filename;
+    filename.print("/tmp/locarray_term2Rest_%d_%d.locals", C->compile_id(), print_counter++);
+    fileStream fs(filename.freeze());
+
+    fs.print("%s", st.freeze());
+    fs.flush();
+    fs.close();
+  }
 
   // Mark the end of the scope set.
   C->debug_info()->end_safepoint(safepoint_pc_offset);
