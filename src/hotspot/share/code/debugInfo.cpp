@@ -213,7 +213,7 @@ void ObjectValue::print_fields_on(outputStream* st) const {
     }
     st->print("]");
   } else {
-    st->print("\n        Fields: ");
+    st->print("\n        Fields: is_root=%d is_scalar_replaced=%d", is_root(), is_scalar_replaced());
     if (_field_values.length() > 0) {
       _field_values.at(0)->print_on(st);
     }

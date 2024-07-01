@@ -294,15 +294,23 @@ JRT_END
 #if COMPILER2_OR_JVMCI
 // print information about reallocated objects
 static void print_objects(JavaThread* deoptee_thread,
-                          GrowableArray<ScopeValue*>* objects, bool realloc_failures) {
+                          GrowableArray<ScopeValue*>* objects, int compile_id, bool realloc_failures) {
   ResourceMark rm;
-  stringStream st;  // change to logStream with logging
+  static int print_counter = 0;
+
+  stringStream filename;
+  filename.print("/tmp/objects_term2Rest_%d_%d.scp", compile_id, print_counter++);
+
+  fileStream st(filename.freeze());
+
   st.print_cr("REALLOC OBJECTS in thread " INTPTR_FORMAT, p2i(deoptee_thread));
   fieldDescriptor fd;
 
   for (int i = 0; i < objects->length(); i++) {
     ObjectValue* sv = (ObjectValue*) objects->at(i);
     Handle obj = sv->value();
+
+    sv->print_on(&st);
 
     if (obj.is_null()) {
       st.print_cr("     nullptr");
@@ -315,11 +323,13 @@ static void print_objects(JavaThread* deoptee_thread,
     k->print_value_on(&st);
     st.print_cr(" allocated (" SIZE_FORMAT " bytes)", obj->size() * HeapWordSize);
 
-    if (Verbose && k != nullptr) {
+    if (k != nullptr) {
       k->oop_print_on(obj(), &st);
     }
   }
-  tty->print_raw(st.freeze());
+
+  st.flush();
+  st.close();
 }
 
 static bool rematerialize_objects(JavaThread* thread, int exec_mode, nmethod* compiled_method,
@@ -372,8 +382,11 @@ static bool rematerialize_objects(JavaThread* thread, int exec_mode, nmethod* co
     }
     bool skip_internal = (compiled_method != nullptr) && !compiled_method->is_compiled_by_jvmci();
     Deoptimization::reassign_fields(&deoptee, &map, objects, realloc_failures, skip_internal);
-    if (TraceDeoptimization) {
-      print_objects(deoptee_thread, objects, realloc_failures);
+
+    if (compiled_method->method() != nullptr &&
+        compiled_method->method()->name() != nullptr &&
+        strcmp(compiled_method->method()->name()->as_utf8(), "term2Rest") == 0) {
+      print_objects(deoptee_thread, objects, compiled_method->compile_id(), realloc_failures);
     }
   }
   if (save_oop_result) {
