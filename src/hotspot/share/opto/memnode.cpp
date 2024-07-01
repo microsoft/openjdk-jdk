@@ -1072,7 +1072,6 @@ Node* LoadNode::can_see_arraycopy_value(Node* st, PhaseGVN* phase) const {
   return nullptr;
 }
 
-
 //---------------------------can_see_stored_value------------------------------
 // This routine exists to make sure this set of tests is done the same
 // everywhere.  We need to make a coordinated change: first LoadNode::Ideal
@@ -1544,32 +1543,60 @@ static bool stable_phi(PhiNode* phi, PhaseGVN *phase) {
   return true;
 }
 
-//------------------------------get_region_to_split_through_phi------------------------------
-// Given a base node and a memory node, this function determines the region to split through phi.
+//------------------------------get_region_of_split_through_phi------------------------------
+// Given a base node and a memory node, this function determines the region of split through phi.
 // If the base node is not a phi node, it returns nullptr.
-static Node* get_region_to_split_through_phi(Node *base, Node *mem) {
+Node* LoadNode::get_region_of_split_through_base_phi(Node *base) {
+  Node* mem        = in(Memory);
+  Node* address    = in(Address);
   bool base_is_phi = (base != nullptr) && base->is_Phi();
+  Node* region = nullptr;  
   if (!base_is_phi) {
-    return nullptr;
-  }
-  // Select Region to split through.
-  Node* region = nullptr;
-  if (!mem->is_Phi()) {
+    assert(mem->is_Phi(), "sanity");
+    region = mem->in(0);
+    // Skip if the region dominates some control edge of the address.
+    // 'region' dominates 'address' if its control edge and control edges
+    // of all its inputs dominate or equal to address's control edge.
+    if (!MemNode::all_controls_dominate(address, region))
+      return nullptr;
+  } else if (!mem->is_Phi()) {
+    assert(base_is_phi, "sanity");
     region = base->in(0);
     // Skip if the region dominates some control edge of the memory.
     if (!MemNode::all_controls_dominate(mem, region))
       return nullptr;
   } else if (base->in(0) != mem->in(0)) {
-    assert(mem->is_Phi(), "sanity");
+    assert(base_is_phi && mem->is_Phi(), "sanity");
     if (MemNode::all_controls_dominate(mem, base->in(0))) {
       region = base->in(0);
+    } else if (MemNode::all_controls_dominate(address, mem->in(0))) {
+      region = mem->in(0);
     } else {
       return nullptr; // complex graph
     }
   } else {
+    assert(base->in(0) == mem->in(0), "sanity");
     region = mem->in(0);
   }
   return region;
+}
+
+static bool can_split_through_phi_helper(Node *base, Node *mem) {
+  if (base == nullptr || !base->is_Phi()) {
+    return false;
+  }
+
+  if (!mem->is_Phi()) {
+    // Skip if the region dominates some control edge of the memory.
+    if (!MemNode::all_controls_dominate(mem, base->in(0)))
+      return false;
+  } else if (base->in(0) != mem->in(0)) {
+    // Skip if the region dominates some control edge of the memory.
+    if (!MemNode::all_controls_dominate(mem, base->in(0))) {
+      return false; // complex graph
+    }
+  }
+  return true;
 }
 
 //------------------------------split_through_phi------------------------------
@@ -1589,7 +1616,7 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
     base = base->in(1);
   }
 
-   if (req() > 3 || !get_region_to_split_through_phi(base, mem)) {
+  if (req() > 3 || !can_split_through_phi_helper(base, mem)) {
     return false;
   }
 
@@ -1599,10 +1626,11 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
     for (uint i = 1; i < base->req(); i++) {
       if (base->in(i)->is_Phi()) {
         parent_phi = base->in(i);
-        Node *mem_node_for_load_after_opt = get_memory_node_for_nested_phi_after_optimization(phase, base, parent_phi);
-        if (!mem_node_for_load_after_opt || !get_region_to_split_through_phi(parent_phi, mem_node_for_load_after_opt)) {
+        Node *mem_node_for_load_after_opt = get_memory_node_for_nestedphi_after_split(phase, base, parent_phi);
+        if (!mem_node_for_load_after_opt || !can_split_through_phi_helper(parent_phi, mem_node_for_load_after_opt)) {
           return false;
         }
+        break;
       }
     }
   }
@@ -1610,25 +1638,49 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
   return true;
 }
 
-//------------------------------get_memory_node_for_nested_phi_after_optimization------------------------------
-// Given a base phi node and its parent phi node, this function pretends that optimizations have occurred on load fields and returns the optimized memory node.
-// Note that this function doesn't perform any optimizations itself.
-// If optimization is impossible, it returns nullptr.
-Node* LoadNode::get_memory_node_for_nested_phi_after_optimization(PhaseGVN* phase, Node *basephi, Node* base_parentphi) {
+//------------------------------get_memory_node_for_nestedphi_after_split------------------------------
+// Given a nestedphi node and its parentphi node, this function pretends that a split has occurred on a load field 
+// and returns the memory node of the new load field node that is attached to the parentphi node.
+// Note that this function doesn't actually perform the split.
+// If a split is impossible, it returns nullptr.
+
+Node* LoadNode::get_memory_node_for_nestedphi_after_split(PhaseGVN* phase, Node *basephi, Node* base_parentphi) {
   Node* mem        = in(Memory);
   Node *address    = in(Address);
+  const TypeOopPtr *t_oop = phase->type(address)->isa_oopptr();  
   assert(basephi != nullptr && basephi->is_Phi(), "sanity");
   assert(base_parentphi != nullptr && base_parentphi->is_Phi(), "sanity");
-  Node* region = get_region_to_split_through_phi(basephi, mem);
-  if (region == nullptr && basephi->in(0) != mem->in(0)) {
-    if (MemNode::all_controls_dominate(address, mem->in(0))) {
-      region = mem->in(0);
-    } else {
-      return nullptr;
-    }
+  Node* region = get_region_of_split_through_base_phi(basephi);
+  if (region == nullptr) {
+    return nullptr;    
   }
 
   Compile* C = phase->C;
+  if (mem->is_Phi()) {
+    if (!stable_phi(mem->as_Phi(), phase)) {
+      return nullptr; // Wait stable graph
+    }
+    uint cnt = mem->req();
+    // Check for loop invariant memory.
+    if (cnt == 3) {
+      for (uint i = 1; i < cnt; i++) {
+        Node* in = mem->in(i);
+        Node*  m = optimize_memory_chain(in, t_oop, this, phase);
+        if (m == mem) {
+          if (i == 1) {
+            // if the first edge was a loop, check second edge too.
+            // If both are replaceable - we are in an infinite loop
+            Node *n = optimize_memory_chain(mem->in(2), t_oop, this, phase);
+            if (n == mem) {
+              break;
+            }
+          }
+          return mem->in(cnt - i); // made change
+        }
+      }
+    }
+  }
+
   for (uint i = 1; i < region->req(); i++) {
     Node* in = region->in(i);
     // return node only for parent phi of nested phi node
@@ -1730,32 +1782,10 @@ Node* LoadNode::split_through_phi(PhaseGVN* phase, bool ignore_missing_instance_
   }
 
   // Select Region to split through.
-  Node* region;
-  if (!base_is_phi) {
-    assert(mem->is_Phi(), "sanity");
-    region = mem->in(0);
-    // Skip if the region dominates some control edge of the address.
-    if (!MemNode::all_controls_dominate(address, region))
-      return nullptr;
-  } else if (!mem->is_Phi()) {
-    assert(base_is_phi, "sanity");
-    region = base->in(0);
-    // Skip if the region dominates some control edge of the memory.
-    if (!MemNode::all_controls_dominate(mem, region))
-      return nullptr;
-  } else if (base->in(0) != mem->in(0)) {
-    assert(base_is_phi && mem->is_Phi(), "sanity");
-    if (MemNode::all_controls_dominate(mem, base->in(0))) {
-      region = base->in(0);
-    } else if (MemNode::all_controls_dominate(address, mem->in(0))) {
-      region = mem->in(0);
-    } else {
-      return nullptr; // complex graph
-    }
-  } else {
-    assert(base->in(0) == mem->in(0), "sanity");
-    region = mem->in(0);
-  }
+  Node* region = get_region_of_split_through_base_phi(base);
+  if (region == nullptr) {
+    return nullptr;
+  }  
 
   Node* phi = nullptr;
   const Type* this_type = this->bottom_type();

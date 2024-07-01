@@ -140,7 +140,7 @@ public class AllocationMergesTests {
                  "testBailOut_C2",
                  "testNestedPhiPolymorphic_C2",
                  "testNestedPhiWithTrap_C2",
-                 "testNestedPhiWithLamda_C2"
+                 "testNestedPhiWithLambda_C2"
 
                 })
     public void runner(RunInfo info) {
@@ -229,7 +229,7 @@ public class AllocationMergesTests {
         Asserts.assertEQ(testBailOut_Interp(cond1, cond2, x, y),                    testBailOut_C2(cond1, cond2, x, y));
         Asserts.assertEQ(testNestedPhiPolymorphic_Interp(cond1, cond2, x, y),       testNestedPhiPolymorphic_C2(cond1, cond2, x, y));
         Asserts.assertEQ(testNestedPhiWithTrap_Interp(cond1, cond2, x, y),          testNestedPhiWithTrap_C2(cond1, cond2, x, y));
-        Asserts.assertEQ(testNestedPhiWithLamda_Interp(cond1, cond2, x, y),         testNestedPhiWithLamda_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testNestedPhiWithLambda_Interp(cond1, cond2, x, y),         testNestedPhiWithLambda_C2(cond1, cond2, x, y));
     }
 
     // -------------------------------------------------------------------------
@@ -1407,8 +1407,8 @@ public class AllocationMergesTests {
             global_escape = p;
         }
 
-    if(!cond1)
-        throw new Exception();
+        if (!cond1)
+            throw new Exception();
 
         return p.y;
     }
@@ -1571,7 +1571,7 @@ public class AllocationMergesTests {
     int testFieldEscapeWithMerge_Intrep(boolean cond1, int x, int y) { return testFieldEscapeWithMerge(cond1, x, y); }
 
     @Test
-    @IR(counts = { IRNode.ALLOC, ">=3"}, phase= CompilePhase.ITER_GVN_AFTER_EA)
+    @IR(counts = { IRNode.ALLOC, ">=1"}, phase= CompilePhase.ITER_GVN_AFTER_EA)
     int testFieldEscapeWithMerge_C2(boolean cond1, int x, int y) { return testFieldEscapeWithMerge(cond1, x, y); }
 
     //--------------------------------------------------------------------------------------------------------------------------------------------
@@ -1756,15 +1756,15 @@ public class AllocationMergesTests {
     //--------------------------------------------------------------------------------------------------------------------------------------------
 
    @DontCompile
-    int testNestedPhiWithLamda_Interp(boolean cond1, boolean cond2, int x, int y) { return testNestedPhiWithLamda(cond1, cond2, x, y); }
+    int testNestedPhiWithLambda_Interp(boolean cond1, boolean cond2, int x, int y) { return testNestedPhiWithLambda(cond1, cond2, x, y); }
 
     @Test
     @IR(counts = { IRNode.ALLOC, "4" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
     @IR(counts = { IRNode.ALLOC, "0" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
-    int testNestedPhiWithLamda_C2(boolean cond1, boolean cond2, int x, int y) { return testNestedPhiWithLamda(cond1, cond2, x, y); }
+    int testNestedPhiWithLambda_C2(boolean cond1, boolean cond2, int x, int y) { return testNestedPhiWithLambda(cond1, cond2, x, y); }
 
     @ForceInline
-    public int testNestedPhiWithLamda(boolean cond1, boolean cond2, int x, int y) {
+    public int testNestedPhiWithLambda(boolean cond1, boolean cond2, int x, int y) {
         Point1 p1 = new Point1(x, y);
         if (cond1)
             p1 = new Point1(x, y);
@@ -1966,7 +1966,7 @@ public class AllocationMergesTests {
 
     class TestThread extends Thread {
         private static Object syncObject = new Object();
-        Point   p;
+        Point p;
 
         TestThread(Point p) {
             this.p = p;

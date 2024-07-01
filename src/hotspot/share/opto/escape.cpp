@@ -484,7 +484,7 @@ bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
     }
   }
 
-  NOT_PRODUCT(if (TraceReduceAllocationMerges && !found_sr_allocate) tty->print_cr("Can NOT reduce Phi %d on invocation %d. No SR Allocate as input.", ophi->_idx, _invocation);)
+  NOT_PRODUCT(if (TraceReduceAllocationMerges && !found_sr_allocate) tty->print_cr("Cannot reduce Phi %d on invocation %d. No SR Allocate as input.", ophi->_idx, _invocation);)
   return found_sr_allocate;
 }
 
@@ -527,45 +527,45 @@ bool ConnectionGraph::has_been_reduced(PhiNode* n, SafePointNode* sfpt) const {
 //  - Phi -> AddP -> Load
 //  - Phi -> CastPP -> SafePoints
 //  - Phi -> CastPP -> AddP -> Load
-bool ConnectionGraph::can_reduce_check_users(Node* n, uint nesting) const {
+bool ConnectionGraph::can_reduce_check_users(Node* n, uint phiNestLevel) const {
   for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
     Node* use = n->fast_out(i);
 
-    if (use->is_SafePoint() && nesting == 0) {
+    if (use->is_SafePoint() && phiNestLevel == 0) {
       if (use->is_Call() && use->as_Call()->has_non_debug_use(n)) {
-        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. Call has non_debug_use().", n->_idx, _invocation);)
+        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. Call has non_debug_use().", n->_idx, _invocation);)
         return false;
       } else if (has_been_reduced(n->is_Phi() ? n->as_Phi() : n->as_CastPP()->in(1)->as_Phi(), use->as_SafePoint())) {
-        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. It has already been reduced.", n->_idx, _invocation);)
+        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. It has already been reduced.", n->_idx, _invocation);)
         return false;
       }
-    } else if (use->is_AddP() && nesting <= 1) {
+    } else if (use->is_AddP() && phiNestLevel <= 1) {
       Node* addp = use;
       for (DUIterator_Fast jmax, j = addp->fast_outs(jmax); j < jmax; j++) {
         Node* use_use = addp->fast_out(j);
         const Type* load_type = _igvn->type(use_use);
 
-        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn, (nesting > 0))) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", n->_idx, _invocation, use_use->Name());)
+        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn, (phiNestLevel > 0))) {
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", n->_idx, _invocation, use_use->Name());)
           return false;
-         } else if (load_type->isa_narrowklass() || load_type->isa_klassptr()) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. [Narrow] Klass Load: %s", n->_idx, _invocation, use_use->Name());)
+        } else if (load_type->isa_narrowklass() || load_type->isa_klassptr()) {
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. [Narrow] Klass Load: %s", n->_idx, _invocation, use_use->Name());)
           return false;
         }
       }
-    } else if (nesting > 0) {
-      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. Unsupported user %s at nesting level %d.", n->_idx, _invocation, use->Name(), nesting);)
+    } else if (phiNestLevel > 0) {
+      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. Unsupported user %s at nesting level %d.", n->_idx, _invocation, use->Name(), phiNestLevel);)
       return false;
     } else if (use->is_Phi()) {
       if (n->_idx == use->_idx) {
-        NOT_PRODUCT(if (TraceReduceAllocationMerges)tty->print_cr("Can NOT reduce Self loop nested Phi");)
+        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Self loop nested Phi");)
         return false;
       } else {
-        if (!can_reduce_check_users(use->as_Phi(), nesting+1)) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce nested Phi %d ", use->_idx);)
+        if (!can_reduce_check_users(use->as_Phi(), phiNestLevel+1)) {
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce nested Phi %d ", use->_idx);)
           return false;
         } else {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges)  tty->print_cr("Can reduce nested Phi %d ", use->_idx);)
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can reduce nested Phi %d ", use->_idx);)
        }
       }
     } else if (use->is_CastPP()) {
@@ -573,7 +573,7 @@ bool ConnectionGraph::can_reduce_check_users(Node* n, uint nesting) const {
       if (cast_t == nullptr || cast_t->make_ptr()->isa_instptr() == nullptr) {
 #ifndef PRODUCT
         if (TraceReduceAllocationMerges) {
-          tty->print_cr("Can NOT reduce Phi %d on invocation %d. CastPP is not to an instance.", n->_idx, _invocation);
+          tty->print_cr("Cannot reduce Phi %d on invocation %d. CastPP is not to an instance.", n->_idx, _invocation);
           use->dump();
         }
 #endif
@@ -592,7 +592,7 @@ bool ConnectionGraph::can_reduce_check_users(Node* n, uint nesting) const {
             if ((opc == Op_CmpP || opc == Op_CmpN) && !can_reduce_cmp(n, iff_cmp)) {
 #ifndef PRODUCT
               if (TraceReduceAllocationMerges) {
-                tty->print_cr("Can NOT reduce Phi %d on invocation %d. CastPP %d doesn't have simple control.", n->_idx, _invocation, use->_idx);
+                tty->print_cr("Cannot reduce Phi %d on invocation %d. CastPP %d doesn't have simple control.", n->_idx, _invocation, use->_idx);
                 n->dump(5);
               }
 #endif
@@ -602,16 +602,16 @@ bool ConnectionGraph::can_reduce_check_users(Node* n, uint nesting) const {
         }
       }
 
-      if (!can_reduce_check_users(use, nesting+1)) {
+      if (!can_reduce_check_users(use, phiNestLevel+1)) {
         return false;
       }
     } else if (use->Opcode() == Op_CmpP || use->Opcode() == Op_CmpN) {
       if (!can_reduce_cmp(n, use)) {
-        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. CmpP/N %d isn't reducible.", n->_idx, _invocation, use->_idx);)
+        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. CmpP/N %d isn't reducible.", n->_idx, _invocation, use->_idx);)
         return false;
       }
     } else {
-      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. One of the uses is: %d %s", n->_idx, _invocation, use->_idx, use->Name());)
+      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. One of the uses is: %d %s", n->_idx, _invocation, use->_idx, use->Name());)
       return false;
     }
   }
@@ -638,7 +638,7 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
     return false;
   }
 
-  if (!can_reduce_phi_check_inputs(ophi) || !can_reduce_check_users(ophi, /* nesting: */ 0)) {
+  if (!can_reduce_phi_check_inputs(ophi) || !can_reduce_check_users(ophi, /* phiNestLevel: */ 0)) {
     return false;
   }
 
@@ -1045,12 +1045,16 @@ void ConnectionGraph::updates_after_load_split(Node* data_phi, Node* previous_lo
       // The base might not be something that we can create an unique
       // type for. If that's the case we are done with that input.
       PointsToNode* jobj_ptn = unique_java_object(base);
-      if (base->is_Phi() && !reducible_merges.member(base)) {
-        continue;
+      if (base->is_Phi()) {
+        if (!reducible_merges.member(base)) {
+          continue;
+        }
+      } else {
+        if (jobj_ptn == nullptr || !jobj_ptn->scalar_replaceable()) {
+          continue;
+        }
       }
-      if (!base->is_Phi() && (jobj_ptn == nullptr || !jobj_ptn->scalar_replaceable())) {
-        continue;
-      }
+
       // Push to alloc_worklist since the base has an unique_type
       alloc_worklist.append_if_missing(new_addp);
 
