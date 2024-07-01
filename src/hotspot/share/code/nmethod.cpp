@@ -1648,89 +1648,13 @@ void nmethod::print_on(outputStream* st, const char* msg) const {
 }
 
 void nmethod::maybe_print_nmethod(const DirectiveSet* directive) {
-  bool printnmethods = directive->PrintAssemblyOption || directive->PrintNMethodsOption;
-  if (printnmethods || PrintDebugInfo || PrintRelocations || PrintDependencies || PrintExceptionHandlers) {
-    print_nmethod(printnmethods);
+  if (this->method() != nullptr && this->method()->name() != nullptr && strcmp(this->method()->name()->as_utf8(), "term2Rest") == 0) {
+    print_nmethod(true);
   }
 }
 
 void nmethod::print_nmethod(bool printmethod) {
-  ttyLocker ttyl;  // keep the following output all in one block
-  if (xtty != nullptr) {
-    xtty->begin_head("print_nmethod");
-    log_identity(xtty);
-    xtty->stamp();
-    xtty->end_head();
-  }
-  // Print the header part, then print the requested information.
-  // This is both handled in decode2().
-  if (printmethod) {
-    ResourceMark m;
-    if (is_compiled_by_c1()) {
-      tty->cr();
-      tty->print_cr("============================= C1-compiled nmethod ==============================");
-    }
-    if (is_compiled_by_jvmci()) {
-      tty->cr();
-      tty->print_cr("=========================== JVMCI-compiled nmethod =============================");
-    }
-    tty->print_cr("----------------------------------- Assembly -----------------------------------");
-    decode2(tty);
-#if defined(SUPPORT_DATA_STRUCTS)
-    if (AbstractDisassembler::show_structs()) {
-      // Print the oops from the underlying CodeBlob as well.
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-      print_oops(tty);
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-      print_metadata(tty);
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-      print_pcs_on(tty);
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-      if (oop_maps() != nullptr) {
-        tty->print("oop maps:"); // oop_maps()->print_on(tty) outputs a cr() at the beginning
-        oop_maps()->print_on(tty);
-        tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-      }
-    }
-#endif
-  } else {
-    print(); // print the header part only.
-  }
-
-#if defined(SUPPORT_DATA_STRUCTS)
-  if (AbstractDisassembler::show_structs()) {
-    methodHandle mh(Thread::current(), _method);
-    if (printmethod || PrintDebugInfo || CompilerOracle::has_option(mh, CompileCommandEnum::PrintDebugInfo)) {
-      print_scopes();
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-    }
-    if (printmethod || PrintRelocations || CompilerOracle::has_option(mh, CompileCommandEnum::PrintRelocations)) {
-      print_relocations();
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-    }
-    if (printmethod || PrintDependencies || CompilerOracle::has_option(mh, CompileCommandEnum::PrintDependencies)) {
-      print_dependencies_on(tty);
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-    }
-    if (printmethod || PrintExceptionHandlers) {
-      print_handler_table();
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-      print_nul_chk_table();
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-    }
-
-    if (printmethod) {
-      print_recorded_oops();
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-      print_recorded_metadata();
-      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
-    }
-  }
-#endif
-
-  if (xtty != nullptr) {
-    xtty->tail("print_nmethod");
-  }
+  print_scopes();
 }
 
 
@@ -3167,8 +3091,6 @@ void nmethod::print_dependencies_on(outputStream* out) {
 }
 #endif
 
-#if defined(SUPPORT_DATA_STRUCTS)
-
 // Print the oops from the underlying CodeBlob.
 void nmethod::print_oops(outputStream* st) {
   ResourceMark m;
@@ -3213,30 +3135,38 @@ void nmethod::print_metadata(outputStream* st) {
   }
 }
 
-#ifndef PRODUCT  // ScopeDesc::print_on() is available only then. Declared as PRODUCT_RETURN
-void nmethod::print_scopes_on(outputStream* st) {
+void nmethod::print_scopes_on(outputStream* st2) {
   // Find the first pc desc for all scopes in the code and print it.
   ResourceMark rm;
-  st->print("scopes:");
+  static int print_counter = 0;
+
+  stringStream filename;
+  filename.print("/tmp/scopes_term2Rest_%d_%d.scp", this->_compile_id, print_counter++);
+
+  fileStream st(filename.freeze());
+
+  st.print("scopes:");
   if (scopes_pcs_begin() < scopes_pcs_end()) {
-    st->cr();
+    st.cr();
     for (PcDesc* p = scopes_pcs_begin(); p < scopes_pcs_end(); p++) {
       if (p->scope_decode_offset() == DebugInformationRecorder::serialized_null)
         continue;
 
       ScopeDesc* sd = scope_desc_at(p->real_pc(this));
       while (sd != nullptr) {
-        sd->print_on(st, p);  // print output ends with a newline
+        sd->print_on(&st, p);  // print output ends with a newline
         sd = sd->sender();
       }
     }
   } else {
-    st->print_cr(" <list empty>");
+    st.print_cr(" <list empty>");
   }
-}
-#endif
 
-#ifndef PRODUCT  // RelocIterator does support printing only then.
+  st.flush();
+  st.close();
+}
+
+#ifndef PRODUCT
 void nmethod::print_relocations() {
   ResourceMark m;       // in case methods get printed via the debugger
   tty->print_cr("relocations:");
@@ -3332,7 +3262,6 @@ void nmethod::print_recorded_metadata() {
     tty->print_cr(" <list empty>");
   }
 }
-#endif
 
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
 
@@ -3953,12 +3882,10 @@ address nmethod::call_instruction_address(address pc) const {
   return nullptr;
 }
 
-#if defined(SUPPORT_DATA_STRUCTS)
 void nmethod::print_value_on(outputStream* st) const {
   st->print("nmethod");
   print_on(st, nullptr);
 }
-#endif
 
 #ifndef PRODUCT
 

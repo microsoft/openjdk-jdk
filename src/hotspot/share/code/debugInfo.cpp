@@ -193,7 +193,6 @@ void ObjectValue::print_on(outputStream* st) const {
 }
 
 void ObjectValue::print_fields_on(outputStream* st) const {
-#ifndef PRODUCT
   if (is_object_merge()) {
     ObjectMergeValue* omv = (ObjectMergeValue*)this;
     st->print("selector=\"");
@@ -223,7 +222,6 @@ void ObjectValue::print_fields_on(outputStream* st) const {
       _field_values.at(i)->print_on(st);
     }
   }
-#endif
 }
 
 
@@ -407,7 +405,6 @@ void MonitorValue::write_on(DebugInfoWriteStream* stream) {
   stream->write_bool(_eliminated);
 }
 
-#ifndef PRODUCT
 void MonitorValue::print_on(outputStream* st) const {
   st->print("monitor{");
   owner()->print_on(st);
@@ -418,4 +415,3 @@ void MonitorValue::print_on(outputStream* st) const {
     st->print(" (eliminated)");
   }
 }
-#endif

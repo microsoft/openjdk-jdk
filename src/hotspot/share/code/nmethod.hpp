@@ -923,12 +923,11 @@ public:
   void print(outputStream* st) const;
   void print_code();
 
-#if defined(SUPPORT_DATA_STRUCTS)
   // print output in opt build for disassembler library
-  void print_relocations()                        PRODUCT_RETURN;
+  void print_relocations() PRODUCT_RETURN;
   void print_pcs_on(outputStream* st);
   void print_scopes() { print_scopes_on(tty); }
-  void print_scopes_on(outputStream* st)          PRODUCT_RETURN;
+  void print_scopes_on(outputStream* st);
   void print_value_on(outputStream* st) const override;
   void print_handler_table();
   void print_nul_chk_table();
@@ -938,9 +937,6 @@ public:
 
   void print_oops(outputStream* st);     // oops from the underlying CodeBlob.
   void print_metadata(outputStream* st); // metadata in metadata pool.
-#else
-  void print_pcs_on(outputStream* st) { return; }
-#endif
 
   void print_calls(outputStream* st)              PRODUCT_RETURN;
   static void print_statistics()                  PRODUCT_RETURN;

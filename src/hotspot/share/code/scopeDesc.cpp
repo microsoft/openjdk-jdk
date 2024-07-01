@@ -191,8 +191,6 @@ ScopeDesc* ScopeDesc::sender() const {
 }
 
 
-#ifndef PRODUCT
-
 void ScopeDesc::print_value_on(outputStream* st) const {
   st->print("  ");
   method()->print_short_name(st);
@@ -282,7 +280,6 @@ void ScopeDesc::print_on(outputStream* st, PcDesc* pd) const {
 #endif // COMPILER2_OR_JVMCI
 }
 
-#endif
 
 void ScopeDesc::verify() {
   Thread* current_thread = Thread::current();

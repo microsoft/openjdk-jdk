@@ -465,11 +465,9 @@ protected:
   void  operator delete(void* p);
   void  operator delete [](void* p) = delete;
 
-#ifndef PRODUCT
   // Printing support
   void print() const;
   virtual void print_on(outputStream* st) const;
-#endif // PRODUCT
 };
 
 // One of the following macros must be used when allocating an array
@@ -553,11 +551,11 @@ protected:
 // should check the ReallocMark.
 class ReallocMark: public StackObj {
 protected:
-  NOT_PRODUCT(int _nesting;)
+  int _nesting;
 
 public:
-  ReallocMark()   PRODUCT_RETURN;
-  void check()    PRODUCT_RETURN;
+  ReallocMark();
+  void check();
 };
 
 // Uses mmapped memory for all allocations. All allocations are initially

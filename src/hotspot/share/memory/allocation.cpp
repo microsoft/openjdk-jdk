@@ -223,7 +223,6 @@ AnyObj::~AnyObj() {
 //--------------------------------------------------------------------------------------
 // Non-product code
 
-#ifndef PRODUCT
 void AnyObj::print() const       { print_on(tty); }
 
 void AnyObj::print_on(outputStream* st) const {
@@ -244,5 +243,3 @@ void ReallocMark::check() {
   }
 #endif
 }
-
-#endif // Non-product

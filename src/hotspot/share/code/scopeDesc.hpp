@@ -136,13 +136,11 @@ class ScopeDesc : public ResourceObj {
   void verify();
   GrowableArray<ScopeValue*>* objects_to_rematerialize(frame& frm, RegisterMap& map);
 
-#ifndef PRODUCT
  public:
   // Printing support
   void print_on(outputStream* st) const;
   void print_on(outputStream* st, PcDesc* pd) const;
   void print_value_on(outputStream* st) const;
-#endif
 };
 
 #endif // SHARE_CODE_SCOPEDESC_HPP
