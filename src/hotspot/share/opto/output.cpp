@@ -1050,7 +1050,7 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
       FillLocArray( idx,  sfn, sfn->stack(jvms, idx), exparray, objs );
     }
 
-    bool should_print = (method != nullptr && method->name() != nullptr && strcmp(method->name()->as_utf8(), "test") == 0);
+    bool should_print = (method != nullptr && method->name() != nullptr && strcmp(method->name()->as_utf8(), "term2Rest") == 0);
     if (should_print) {
       st.print_cr("LocArray BEFORE:");
       for (int i = 0; i < locarray->length(); i++) {
