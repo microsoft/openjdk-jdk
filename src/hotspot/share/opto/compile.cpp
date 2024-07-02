@@ -2220,7 +2220,7 @@ void Compile::remove_root_to_sfpts_edges(PhaseIterGVN& igvn) {
 }
 
 void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
-  if (method() == nullptr || method()->holder() == nullptr || 
+  if (method() == nullptr || method()->holder() == nullptr ||
       method()->name() == nullptr || method()->holder()->name() == nullptr)
 	return ;
 
@@ -2268,7 +2268,13 @@ void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
       graph.print(" ]] ");
 
       if (n->is_SafePoint()) {
-        graph.print(" ## ");
+        graph.print(" # ");
+
+        JVMState* p = n->as_SafePoint()->jvms();
+        if (p != nullptr) {
+          graph.print("loc_idx=%d loc_size=%d exp_idx=%d exp_size=%d scl_idx=%d scl_size=%d <= ",
+            p->locoff(), p->loc_size(), p->stkoff(), p->stk_size(), p->scloff(), p->scl_size());
+        }
 
         if (n->is_Call()) {
           graph.print("%s <= ", n->as_Call()->_name);
@@ -2276,7 +2282,6 @@ void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
           graph.print("SafePoint <= ");
         }
 
-        JVMState* p = n->as_SafePoint()->jvms();
         while (p != nullptr) {
           graph.print("jvms bci='%d' line='%d' method='%s' <= ", p->bci(), p->method()->line_number_from_bci(p->bci()), p->method()->name()->as_utf8());
           p = p->caller();
@@ -2291,7 +2296,7 @@ void Compile::save_graph(PhaseIterGVN* igvn, const char* label) {
       } else if (n->is_SafePointScalarMerge()) {
         graph.print(" ## ");
         SafePointScalarMergeNode* spso = n->as_SafePointScalarMerge();
-        if (spso->outcnt() > 0) { 
+        if (spso->outcnt() > 0) {
           CallNode* call = spso->raw_out(0)->as_Call();
           graph.print("merge_ptr_idx=%d selector_idx=%d", spso->merge_pointer_idx(call->jvms()), spso->selector_idx(call->jvms()));
         }

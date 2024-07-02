@@ -1050,7 +1050,19 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
       FillLocArray( idx,  sfn, sfn->stack(jvms, idx), exparray, objs );
     }
 
-    bool should_print = (method != nullptr && method->name() != nullptr && strcmp(method->name()->as_utf8(), "test") == 0);
+    bool should_print = method != nullptr && method->holder() != nullptr &&
+                        method->name() != nullptr && method->holder()->name() != nullptr &&
+                        strstr(method->holder()->name()->as_utf8(), "JavacParser") != nullptr &&
+    (
+      (strcmp(method->name()->as_utf8(), "merge") == 0) ||
+      (strcmp(method->name()->as_utf8(), "foldIfNeeded") == 0) ||
+      (strcmp(method->name()->as_utf8(), "foldStrings") == 0) ||
+      (strcmp(method->name()->as_utf8(), "term2Rest") == 0) ||
+      (strcmp(method->name()->as_utf8(), "term2") == 0) ||
+      (strcmp(method->name()->as_utf8(), "term1") == 0) ||
+      (strcmp(method->name()->as_utf8(), "term") == 0)
+     );
+
     if (should_print) {
       st.print_cr("LocArray BEFORE:");
       for (int i = 0; i < locarray->length(); i++) {
@@ -1160,6 +1172,7 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
           bool is_root = locarray->contains(ov) || exparray->contains(ov) || contains_as_owner(monarray, ov);
           if (should_print && ov->is_root() && !is_root) {
             st.print_cr("********** Changing ov (%d) from ROOT to NON-ROOT", ov->id());
+            *((int*)0) = -1; // Invalidate id for non-root objects
           }
           ov->set_root(is_root);
         }
