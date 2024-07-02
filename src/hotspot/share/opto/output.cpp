@@ -1032,6 +1032,7 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
     // to support GC; these do not support deoptimization.
     int num_locs = (method == nullptr) ? 0 : jvms->loc_size();
     int num_exps = (method == nullptr) ? 0 : jvms->stk_size();
+    int num_scl = (method == nullptr) ? 0 : jvms->scl_size();
     int num_mon  = jvms->nof_monitors();
     assert(method == nullptr || jvms->bci() < 0 || num_locs == method->max_locals(),
            "JVMS local count must match that of the method");
@@ -1062,22 +1063,6 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
       (strcmp(method->name()->as_utf8(), "term1") == 0) ||
       (strcmp(method->name()->as_utf8(), "term") == 0)
      );
-
-    if (should_print) {
-      st.print_cr("LocArray BEFORE:");
-      for (int i = 0; i < locarray->length(); i++) {
-        if (!locarray->at(i)->is_object() && !locarray->at(i)->is_object_merge()) continue;
-        locarray->at(i)->print_on(&st);
-        st.cr();
-      }
-      st.print_cr("------------------");
-      st.print_cr("ExpArray BEFORE:");
-      for (int i = 0; i < exparray->length(); i++) {
-        if (!exparray->at(i)->is_object() && !exparray->at(i)->is_object_merge()) continue;
-        exparray->at(i)->print_on(&st);
-        st.cr();
-      }
-    }
 
     // Add in mappings of the monitors
     assert( !method ||
@@ -1170,6 +1155,18 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
         for (int j = 0; j< merge->possible_objects()->length(); j++) {
           ObjectValue* ov = merge->possible_objects()->at(j)->as_ObjectValue();
           bool is_root = locarray->contains(ov) || exparray->contains(ov) || contains_as_owner(monarray, ov);
+
+          for (int idx = 0; idx < num_scl; idx++) {
+            Node* scalarized_desc = sfn->scalar(jvms, idx);
+            if (scalarized_desc->is_SafePointScalarObject()) {
+              ObjectValue* sv = (ObjectValue*) sv_for_node_id(objs, scalarized_desc->_idx);
+              if (sv == ov || sv->id() == ov->id()) {
+                is_root = true;
+                break;
+              }
+            }
+          }
+
           if (should_print && ov->is_root() && !is_root) {
             st.print_cr("********** Changing ov (%d) from ROOT to NON-ROOT", ov->id());
             *((int*)0) = -1; // Invalidate id for non-root objects
@@ -1178,32 +1175,6 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
         }
       }
     }
-
-    if (should_print) {
-      st.cr();
-      st.print_cr("LocArray AFTER:");
-      for (int i = 0; i < locarray->length(); i++) {
-        if (!locarray->at(i)->is_object() && !locarray->at(i)->is_object_merge()) continue;
-        locarray->at(i)->print_on(&st);
-        st.cr();
-      }
-      st.print_cr("------------------");
-      st.print_cr("ExpArray AFTER:");
-      for (int i = 0; i < exparray->length(); i++) {
-        if (!exparray->at(i)->is_object() && !exparray->at(i)->is_object_merge()) continue;
-        exparray->at(i)->print_on(&st);
-        st.cr();
-      }
-      st.print_cr("------------------");
-      st.print_cr("MonArray AFTER:");
-      for (int i = 0; i < monarray->length(); i++) {
-        monarray->at(i)->print_on(&st);
-        st.cr();
-      }
-
-      st.cr(); st.cr(); st.cr(); st.cr();
-    }
-
 
     // We dump the object pool first, since deoptimization reads it in first.
     C->debug_info()->dump_object_pool(objs);

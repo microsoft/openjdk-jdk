@@ -861,7 +861,11 @@ public:
   Node *stack(const JVMState* jvms, uint idx) const {
     assert(verify_jvms(jvms), "jvms must match");
     return in(_jvmadj + jvms->stkoff() + idx);
- }
+  }
+  Node *scalar(const JVMState* jvms, uint idx) const {
+    assert(verify_jvms(jvms), "jvms must match");
+    return in(_jvmadj + jvms->scloff() + idx);
+  }
   Node *monitor_obj(const JVMState* jvms, uint idx) const {
     assert(verify_jvms(jvms), "jvms must match");
     return in(_jvmadj + jvms->monitor_obj_offset(idx));
