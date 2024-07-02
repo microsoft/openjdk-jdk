@@ -1169,7 +1169,6 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
 
           if (should_print && ov->is_root() && !is_root) {
             st.print_cr("********** Changing ov (%d) from ROOT to NON-ROOT", ov->id());
-            *((int*)0) = -1; // Invalidate id for non-root objects
           }
           ov->set_root(is_root);
         }
