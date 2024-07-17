@@ -112,9 +112,14 @@ static int compare_methods(Method** a, Method** b) {
 static void collect_profiled_methods(Method* m) {
   Thread* thread = Thread::current();
   methodHandle mh(thread, m);
-  if ((m->method_data() != nullptr) &&
-      (PrintMethodData || CompilerOracle::should_print(mh))) {
-    collected_profiled_methods->push(m);
+  if ((m->method_data() != nullptr)) {
+      bool should_print = PrintMethodData ||
+                          CompilerOracle::should_print(mh, CompLevel::CompLevel_simple) ||
+                          CompilerOracle::should_print(mh, CompLevel::CompLevel_limited_profile) ||
+                          CompilerOracle::should_print(mh, CompLevel::CompLevel_full_profile);
+    if (should_print) {
+      collected_profiled_methods->push(m);
+    }
   }
 }
 

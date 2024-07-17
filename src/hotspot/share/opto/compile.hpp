@@ -679,8 +679,8 @@ private:
   void          set_has_monitors(bool v)         { _has_monitors = v; }
 
   // check the CompilerOracle for special behaviours for this compile
-  bool          method_has_option(CompileCommandEnum option) {
-    return method() != nullptr && method()->has_option(option);
+  bool          method_has_option(CompileCommandEnum option, int comp_level) {
+    return method() != nullptr && method()->has_option(option, comp_level);
   }
 
 #ifndef PRODUCT

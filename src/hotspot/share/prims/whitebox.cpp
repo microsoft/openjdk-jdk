@@ -847,11 +847,8 @@ WB_ENTRY(jboolean, WB_IsMethodCompiled(JNIEnv* env, jobject o, jobject method, j
   return !code->is_marked_for_deoptimization();
 WB_END
 
-static bool is_excluded_for_compiler(AbstractCompiler* comp, methodHandle& mh) {
-  if (comp == nullptr) {
-    return true;
-  }
-  DirectiveSet* directive = DirectivesStack::getMatchingDirective(mh, comp);
+static bool is_excluded_for_compiler(int comp_level, methodHandle& mh) {
+  DirectiveSet* directive = DirectivesStack::getMatchingDirective(mh, comp_level);
   bool exclude = directive->ExcludeOption;
   DirectivesStack::release(directive);
   return exclude;
@@ -879,8 +876,10 @@ WB_ENTRY(jboolean, WB_IsMethodCompilable(JNIEnv* env, jobject o, jobject method,
   // to exclude a compilation of 'method'.
   if (comp_level == CompLevel_any) {
     // Both compilers could have ExcludeOption set. Check all combinations.
-    bool excluded_c1 = is_excluded_for_compiler(CompileBroker::compiler1(), mh);
-    bool excluded_c2 = is_excluded_for_compiler(CompileBroker::compiler2(), mh);
+    bool excluded_c1 = is_excluded_for_compiler(CompLevel::CompLevel_simple, mh) &&
+                       is_excluded_for_compiler(CompLevel::CompLevel_limited_profile, mh) &&
+                       is_excluded_for_compiler(CompLevel::CompLevel_full_profile, mh);
+    bool excluded_c2 = is_excluded_for_compiler(CompLevel::CompLevel_full_optimization, mh);
     if (excluded_c1 && excluded_c2) {
       // Compilation of 'method' excluded by both compilers.
       return false;
@@ -893,7 +892,7 @@ WB_ENTRY(jboolean, WB_IsMethodCompilable(JNIEnv* env, jobject o, jobject method,
       // C2 only has ExcludeOption set: Check if compilable with C1.
       return can_be_compiled_at_level(mh, is_osr, CompLevel_simple);
     }
-  } else if (comp_level > CompLevel_none && is_excluded_for_compiler(CompileBroker::compiler((int)comp_level), mh)) {
+  } else if (comp_level > CompLevel_none && is_excluded_for_compiler(comp_level, mh)) {
     // Compilation of 'method' excluded by compiler used for 'comp_level'.
     return false;
   }
@@ -925,10 +924,10 @@ WB_ENTRY(jboolean, WB_IsIntrinsicAvailable(JNIEnv* env, jobject o, jobject metho
     compilation_context_id = reflected_method_to_jmid(thread, env, compilation_context);
     CHECK_JNI_EXCEPTION_(env, JNI_FALSE);
     methodHandle cch(THREAD, Method::checked_resolve_jmethod_id(compilation_context_id));
-    directive = DirectivesStack::getMatchingDirective(cch, comp);
+    directive = DirectivesStack::getMatchingDirective(cch, compLevel);
   } else {
     // Calling with null matches default directive
-    directive = DirectivesStack::getDefaultDirective(comp);
+    directive = DirectivesStack::getDefaultDirective(compLevel);
   }
   bool result = comp->is_intrinsic_available(mh, directive);
   DirectivesStack::release(directive);
@@ -1085,7 +1084,7 @@ bool WhiteBox::compile_method(Method* method, int comp_level, int bci, JavaThrea
 
   // Check if compilation is blocking
   methodHandle mh(THREAD, method);
-  DirectiveSet* directive = DirectivesStack::getMatchingDirective(mh, comp);
+  DirectiveSet* directive = DirectivesStack::getMatchingDirective(mh, comp_level);
   bool is_blocking = !directive->BackgroundCompilationOption;
   DirectivesStack::release(directive);
 
@@ -1134,7 +1133,7 @@ WB_ENTRY(jboolean, WB_ShouldPrintAssembly(JNIEnv* env, jobject o, jobject method
   CHECK_JNI_EXCEPTION_(env, JNI_FALSE);
 
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  DirectiveSet* directive = DirectivesStack::getMatchingDirective(mh, CompileBroker::compiler(comp_level));
+  DirectiveSet* directive = DirectivesStack::getMatchingDirective(mh, comp_level);
   bool result = directive->PrintAssemblyOption;
   DirectivesStack::release(directive);
 
@@ -1159,10 +1158,11 @@ WB_ENTRY(jint, WB_MatchesInline(JNIEnv* env, jobject o, jobject method, jstring 
   }
 
   // Pattern works - now check if it matches
+  // TODO: Maybe add a "comp_level" parameter?
   int result;
-  if (m->match(mh, InlineMatcher::force_inline)) {
+  if (m->match(mh, CompLevel::CompLevel_any, InlineMatcher::force_inline)) {
     result = 2; // Force inline match
-  } else if (m->match(mh, InlineMatcher::dont_inline)) {
+  } else if (m->match(mh, CompLevel::CompLevel_any, InlineMatcher::dont_inline)) {
     result = 1; // Dont inline match
   } else {
     result = 0; // No match
@@ -1190,7 +1190,8 @@ WB_ENTRY(jint, WB_MatchesMethod(JNIEnv* env, jobject o, jobject method, jstring 
   }
 
   // Pattern works - now check if it matches
-  int result = m->matches(mh);
+  // TODO: Maybe add a "comp_level" parameter
+  int result = m->matches(mh, CompLevel::CompLevel_any);
   delete m;
   assert(result == 0 || result == 1, "Result out of range");
   return result;
@@ -1993,7 +1994,8 @@ static bool GetMethodOption(JavaThread* thread, JNIEnv* env, jobject method, jst
   if (!CompilerOracle::option_matches_type(option, *value)) {
     return false;
   }
-  return CompilerOracle::has_option_value(mh, option, *value);
+  // TODO: Maybe add a "comp_level" parameter
+  return CompilerOracle::has_option_value(mh, option, CompLevel::CompLevel_any, *value);
 }
 
 WB_ENTRY(jobject, WB_GetMethodBooleaneOption(JNIEnv* env, jobject wb, jobject method, jstring name))

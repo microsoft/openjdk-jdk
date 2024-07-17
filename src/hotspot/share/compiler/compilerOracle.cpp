@@ -164,7 +164,7 @@ class TypedMethodOptionMatcher : public MethodMatcher {
 
   ~TypedMethodOptionMatcher();
   static TypedMethodOptionMatcher* parse_method_pattern(char*& line, char* errorbuf, const int buf_size);
-  TypedMethodOptionMatcher* match(const methodHandle &method, CompileCommandEnum option);
+  TypedMethodOptionMatcher* match(const methodHandle &method, CompileCommandEnum option, int comp_level);
 
   void init(CompileCommandEnum option, TypedMethodOptionMatcher* next) {
     _next = next;
@@ -173,8 +173,8 @@ class TypedMethodOptionMatcher : public MethodMatcher {
 
   void init_matcher(Symbol* class_name, Mode class_mode,
                     Symbol* method_name, Mode method_mode,
-                    Symbol* signature) {
-    MethodMatcher::init(class_name, class_mode, method_name, method_mode, signature);
+                    Symbol* signature, int comp_level) {
+    MethodMatcher::init(class_name, class_mode, method_name, method_mode, signature, comp_level);
   }
 
   void set_next(TypedMethodOptionMatcher* next) {_next = next; }
@@ -304,11 +304,11 @@ TypedMethodOptionMatcher* TypedMethodOptionMatcher::parse_method_pattern(char*& 
   return tom;
 }
 
-TypedMethodOptionMatcher* TypedMethodOptionMatcher::match(const methodHandle& method, CompileCommandEnum option) {
+TypedMethodOptionMatcher* TypedMethodOptionMatcher::match(const methodHandle& method, CompileCommandEnum option, int comp_level) {
   TypedMethodOptionMatcher* current = this;
   while (current != nullptr) {
     if (current->_option == option) {
-      if (current->matches(method)) {
+      if (current->matches(method, comp_level)) {
         return current;
       }
     }
@@ -351,13 +351,13 @@ static void register_command(TypedMethodOptionMatcher* matcher,
 }
 
 template<typename T>
-bool CompilerOracle::has_option_value(const methodHandle& method, CompileCommandEnum option, T& value) {
+bool CompilerOracle::has_option_value(const methodHandle& method, CompileCommandEnum option, int comp_level, T& value) {
   assert(option_matches_type(option, value), "Value must match option type");
   if (!has_command(option)) {
     return false;
   }
   if (option_list != nullptr) {
-    TypedMethodOptionMatcher* m = option_list->match(method, option);
+    TypedMethodOptionMatcher* m = option_list->match(method, option, comp_level);
     if (m != nullptr) {
       value = m->value<T>();
       return true;
@@ -366,12 +366,12 @@ bool CompilerOracle::has_option_value(const methodHandle& method, CompileCommand
   return false;
 }
 
-static bool resolve_inlining_predicate(CompileCommandEnum option, const methodHandle& method) {
+static bool resolve_inlining_predicate(CompileCommandEnum option, const methodHandle& method, int comp_level) {
   assert(option == CompileCommandEnum::Inline || option == CompileCommandEnum::DontInline, "Sanity");
   bool v1 = false;
   bool v2 = false;
-  bool has_inline = CompilerOracle::has_option_value(method, CompileCommandEnum::Inline, v1);
-  bool has_dnotinline = CompilerOracle::has_option_value(method, CompileCommandEnum::DontInline, v2);
+  bool has_inline = CompilerOracle::has_option_value(method, CompileCommandEnum::Inline, comp_level, v1);
+  bool has_dnotinline = CompilerOracle::has_option_value(method, CompileCommandEnum::DontInline, comp_level, v2);
   if (has_inline && has_dnotinline) {
     if (v1 && v2) {
       // Conflict options detected
@@ -382,7 +382,7 @@ static bool resolve_inlining_predicate(CompileCommandEnum option, const methodHa
       while (current != nullptr) {
         last_one = current->option();
         if (last_one == CompileCommandEnum::Inline || last_one == CompileCommandEnum::DontInline) {
-          if (current->matches(method)) {
+          if (current->matches(method, comp_level)) {
             return last_one == option;
           }
         }
@@ -403,14 +403,14 @@ static bool resolve_inlining_predicate(CompileCommandEnum option, const methodHa
   }
 }
 
-static bool check_predicate(CompileCommandEnum option, const methodHandle& method) {
+static bool check_predicate(CompileCommandEnum option, const methodHandle& method, int comp_level) {
   // Special handling for Inline and DontInline since conflict options may be specified
   if (option == CompileCommandEnum::Inline || option == CompileCommandEnum::DontInline) {
-    return resolve_inlining_predicate(option, method);
+    return resolve_inlining_predicate(option, method, comp_level);
   }
 
   bool value = false;
-  if (CompilerOracle::has_option_value(method, option, value)) {
+  if (CompilerOracle::has_option_value(method, option, comp_level, value)) {
     return value;
   }
   return false;
@@ -421,11 +421,11 @@ bool CompilerOracle::has_any_command_set() {
 }
 
 // Explicit instantiation for all OptionTypes supported.
-template bool CompilerOracle::has_option_value<intx>(const methodHandle& method, CompileCommandEnum option, intx& value);
-template bool CompilerOracle::has_option_value<uintx>(const methodHandle& method, CompileCommandEnum option, uintx& value);
-template bool CompilerOracle::has_option_value<bool>(const methodHandle& method, CompileCommandEnum option, bool& value);
-template bool CompilerOracle::has_option_value<ccstr>(const methodHandle& method, CompileCommandEnum option, ccstr& value);
-template bool CompilerOracle::has_option_value<double>(const methodHandle& method, CompileCommandEnum option, double& value);
+template bool CompilerOracle::has_option_value<intx>(const methodHandle& method, CompileCommandEnum option, int comp_level, intx& value);
+template bool CompilerOracle::has_option_value<uintx>(const methodHandle& method, CompileCommandEnum option, int comp_level, uintx& value);
+template bool CompilerOracle::has_option_value<bool>(const methodHandle& method, CompileCommandEnum option, int comp_level, bool& value);
+template bool CompilerOracle::has_option_value<ccstr>(const methodHandle& method, CompileCommandEnum option, int comp_level, ccstr& value);
+template bool CompilerOracle::has_option_value<double>(const methodHandle& method, CompileCommandEnum option, int comp_level, double& value);
 
 template<typename T>
 bool CompilerOracle::option_matches_type(CompileCommandEnum option, T& value) {
@@ -445,32 +445,32 @@ template bool CompilerOracle::option_matches_type<bool>(CompileCommandEnum optio
 template bool CompilerOracle::option_matches_type<ccstr>(CompileCommandEnum option, ccstr& value);
 template bool CompilerOracle::option_matches_type<double>(CompileCommandEnum option, double& value);
 
-bool CompilerOracle::has_option(const methodHandle& method, CompileCommandEnum option) {
+bool CompilerOracle::has_option(const methodHandle& method, CompileCommandEnum option, int comp_level) {
   bool value = false;
-  has_option_value(method, option, value);
+  has_option_value(method, option, comp_level, value);
   return value;
 }
 
-bool CompilerOracle::should_exclude(const methodHandle& method) {
-  if (check_predicate(CompileCommandEnum::Exclude, method)) {
+bool CompilerOracle::should_exclude(const methodHandle& method, int comp_level) {
+  if (check_predicate(CompileCommandEnum::Exclude, method, comp_level)) {
     return true;
   }
   if (has_command(CompileCommandEnum::CompileOnly)) {
-    return !check_predicate(CompileCommandEnum::CompileOnly, method);
+    return !check_predicate(CompileCommandEnum::CompileOnly, method, comp_level);
   }
   return false;
 }
 
-bool CompilerOracle::should_inline(const methodHandle& method) {
-  return (check_predicate(CompileCommandEnum::Inline, method));
+bool CompilerOracle::should_inline(const methodHandle& method, int comp_level) {
+  return (check_predicate(CompileCommandEnum::Inline, method, comp_level));
 }
 
-bool CompilerOracle::should_not_inline(const methodHandle& method) {
-  return check_predicate(CompileCommandEnum::DontInline, method) || check_predicate(CompileCommandEnum::Exclude, method);
+bool CompilerOracle::should_not_inline(const methodHandle& method, int comp_level) {
+  return check_predicate(CompileCommandEnum::DontInline, method, comp_level) || check_predicate(CompileCommandEnum::Exclude, method, comp_level);
 }
 
-bool CompilerOracle::should_print(const methodHandle& method) {
-  return check_predicate(CompileCommandEnum::Print, method);
+bool CompilerOracle::should_print(const methodHandle& method, int comp_level) {
+  return check_predicate(CompileCommandEnum::Print, method, comp_level);
 }
 
 bool CompilerOracle::should_print_methods() {
@@ -486,20 +486,20 @@ bool CompilerOracle::should_print_final_memstat_report() {
   return print_final_memstat_report;
 }
 
-bool CompilerOracle::should_log(const methodHandle& method) {
+bool CompilerOracle::should_log(const methodHandle& method, int comp_level) {
   if (!LogCompilation) return false;
   if (!has_command(CompileCommandEnum::Log)) {
     return true;  // by default, log all
   }
-  return (check_predicate(CompileCommandEnum::Log, method));
+  return check_predicate(CompileCommandEnum::Log, method, comp_level);
 }
 
-bool CompilerOracle::should_break_at(const methodHandle& method) {
-  return check_predicate(CompileCommandEnum::Break, method);
+bool CompilerOracle::should_break_at(const methodHandle& method, int comp_level) {
+  return check_predicate(CompileCommandEnum::Break, method, comp_level);
 }
 
-void CompilerOracle::tag_blackhole_if_possible(const methodHandle& method) {
-  if (!check_predicate(CompileCommandEnum::Blackhole, method)) {
+void CompilerOracle::tag_blackhole_if_possible(const methodHandle& method, int comp_level) {
+  if (!check_predicate(CompileCommandEnum::Blackhole, method, comp_level)) {
     return;
   }
   guarantee(UnlockExperimentalVMOptions, "Checked during initial parsing");

@@ -103,7 +103,7 @@ ciMethod::ciMethod(const methodHandle& h_m, ciInstanceKlass* holder) :
 #endif // COMPILER2
 
   // Check for blackhole intrinsic and then populate the intrinsic ID.
-  CompilerOracle::tag_blackhole_if_possible(h_m);
+  CompilerOracle::tag_blackhole_if_possible(h_m, CURRENT_ENV->comp_level());
   _intrinsic_id       = h_m->intrinsic_id();
 
   ciEnv *env = CURRENT_ENV;
@@ -1063,21 +1063,21 @@ MethodCounters* ciMethod::ensure_method_counters() {
 // ------------------------------------------------------------------
 // ciMethod::has_option
 //
-bool ciMethod::has_option(CompileCommandEnum option) {
+bool ciMethod::has_option(CompileCommandEnum option, int comp_level) {
   check_is_loaded();
   VM_ENTRY_MARK;
   methodHandle mh(THREAD, get_Method());
-  return CompilerOracle::has_option(mh, option);
+  return CompilerOracle::has_option(mh, option, comp_level);
 }
 
 // ------------------------------------------------------------------
 // ciMethod::has_option_value
 //
-bool ciMethod::has_option_value(CompileCommandEnum option, double& value) {
+bool ciMethod::has_option_value(CompileCommandEnum option, int comp_level, double& value) {
   check_is_loaded();
   VM_ENTRY_MARK;
   methodHandle mh(THREAD, get_Method());
-  return CompilerOracle::has_option_value(mh, option, value);
+  return CompilerOracle::has_option_value(mh, option, comp_level, value);
 }
 // ------------------------------------------------------------------
 // ciMethod::can_be_compiled

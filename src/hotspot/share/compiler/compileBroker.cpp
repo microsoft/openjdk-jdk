@@ -1333,17 +1333,17 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
     return nullptr;
   }
 
+#if INCLUDE_JVMCI
   AbstractCompiler *comp = CompileBroker::compiler(comp_level);
   assert(comp != nullptr, "Ensure we have a compiler");
 
-#if INCLUDE_JVMCI
   if (comp->is_jvmci() && !JVMCI::can_initialize_JVMCI()) {
     // JVMCI compilation is not yet initializable.
     return nullptr;
   }
 #endif
 
-  DirectiveSet* directive = DirectivesStack::getMatchingDirective(method, comp);
+  DirectiveSet* directive = DirectivesStack::getMatchingDirective(method, comp_level);
   // CompileBroker::compile_method can trap and can have pending async exception.
   nmethod* nm = CompileBroker::compile_method(method, osr_bci, comp_level, hot_method, hot_count, compile_reason, directive, THREAD);
   DirectivesStack::release(directive);
@@ -1547,7 +1547,7 @@ bool CompileBroker::compilation_is_prohibited(const methodHandle& method, int os
 
   // The method may be explicitly excluded by the user.
   double scale;
-  if (excluded || (CompilerOracle::has_option_value(method, CompileCommandEnum::CompileThresholdScaling, scale) && scale == 0)) {
+  if (excluded || (CompilerOracle::has_option_value(method, CompileCommandEnum::CompileThresholdScaling, comp_level, scale) && scale == 0)) {
     bool quietly = CompilerOracle::be_quiet();
     if (PrintCompilation && !quietly) {
       // This does not happen quietly...

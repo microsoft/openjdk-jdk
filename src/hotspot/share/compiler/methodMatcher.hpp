@@ -46,6 +46,7 @@ class MethodMatcher : public CHeapObj<mtCompiler> {
   Symbol*        _signature;
   Mode           _class_mode;
   Mode           _method_mode;
+  int            _comp_level; /* Each bit i (0 <= i <= 4) represents a CompLevel. */
 
  public:
   Symbol* class_name() const { return _class_name; }
@@ -57,15 +58,16 @@ class MethodMatcher : public CHeapObj<mtCompiler> {
   MethodMatcher();
   ~MethodMatcher();
 
-  void init(Symbol* class_name, Mode class_mode, Symbol* method_name, Mode method_mode, Symbol* signature);
+  void init(Symbol* class_name, Mode class_mode, Symbol* method_name, Mode method_mode, Symbol* signature, int comp_level);
   static void parse_method_pattern(char*& line, const char*& error_msg, MethodMatcher* m);
   static void print_symbol(outputStream* st, Symbol* h, Mode mode);
-  bool matches(const methodHandle& method) const;
+  bool matches(const methodHandle& method, int comp_level) const;
   void print_base(outputStream* st);
 
  private:
   static bool canonicalize(char * line, const char *& error_msg);
   bool match(Symbol* candidate, Symbol* match, Mode match_mode) const;
+  bool match(int comp_level) const;
 };
 
 class BasicMatcher : public MethodMatcher {
@@ -82,7 +84,7 @@ public:
   }
 
   static BasicMatcher* parse_method_pattern(char* line, const char*& error_msg, bool expect_trailing_chars);
-  bool match(const methodHandle& method);
+  bool match(const methodHandle& method, int comp_level);
   void set_next(BasicMatcher* next) { _next = next; }
   BasicMatcher* next() { return _next; }
 
@@ -113,7 +115,7 @@ private:
 
 public:
   static InlineMatcher* parse_method_pattern(char* line, const char*& error_msg);
-  bool match(const methodHandle& method, int inline_action);
+  bool match(const methodHandle& method, int comp_level, int inline_action);
   void print(outputStream* st);
   void set_next(InlineMatcher* next) { _next = next; }
   InlineMatcher* next() { return _next; }

@@ -568,12 +568,12 @@ C2V_END
 
 C2V_VMENTRY_0(jboolean, hasNeverInlineDirective,(JNIEnv* env, jobject, ARGUMENT_PAIR(method)))
   methodHandle method (THREAD, UNPACK_PAIR(Method, method));
-  return !Inline || CompilerOracle::should_not_inline(method) || method->dont_inline();
+  return !Inline || CompilerOracle::should_not_inline(method, CompLevel::CompLevel_full_optimization) || method->dont_inline();
 C2V_END
 
 C2V_VMENTRY_0(jboolean, shouldInlineMethod,(JNIEnv* env, jobject, ARGUMENT_PAIR(method)))
   methodHandle method (THREAD, UNPACK_PAIR(Method, method));
-  return CompilerOracle::should_inline(method) || method->force_inline();
+  return CompilerOracle::should_inline(method, CompLevel::CompLevel_full_optimization) || method->force_inline();
 C2V_END
 
 C2V_VMENTRY_NULL(jobject, lookupType, (JNIEnv* env, jobject, jstring jname, ARGUMENT_PAIR(accessing_klass), jint accessing_klass_loader, jboolean resolve))

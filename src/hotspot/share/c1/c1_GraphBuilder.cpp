@@ -3588,7 +3588,7 @@ const char* GraphBuilder::check_can_parse(ciMethod* callee) const {
 
 // negative filter: should callee NOT be inlined?  returns null, ok to inline, or rejection msg
 const char* GraphBuilder::should_not_inline(ciMethod* callee) const {
-  if ( compilation()->directive()->should_not_inline(callee)) return "disallowed by CompileCommand";
+  if ( compilation()->directive()->should_not_inline(callee, compilation()->env()->comp_level())) return "disallowed by CompileCommand";
   if ( callee->dont_inline())          return "don't inline by annotation";
   return nullptr;
 }
@@ -3918,7 +3918,7 @@ bool GraphBuilder::try_inline_full(ciMethod* callee, bool holder_known, bool ign
   }
 
   // now perform tests that are based on flag settings
-  bool inlinee_by_directive = compilation()->directive()->should_inline(callee);
+  bool inlinee_by_directive = compilation()->directive()->should_inline(callee, compilation()->env()->comp_level());
   if (callee->force_inline() || inlinee_by_directive) {
     if (inline_level() > MaxForceInlineLevel                      ) INLINE_BAILOUT("MaxForceInlineLevel");
     if (recursive_inline_level(callee) > C1MaxRecursiveInlineLevel) INLINE_BAILOUT("recursive inlining too deep");

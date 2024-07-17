@@ -1288,7 +1288,7 @@ JVMCIObject JVMCIEnv::get_jvmci_method(const methodHandle& method, JVMCI_TRAPS) 
   JVMCIKlassHandle holder_klass(THREAD, method->method_holder());
   JVMCIObject holder = get_jvmci_type(holder_klass, JVMCI_CHECK_(JVMCIObject()));
 
-  CompilerOracle::tag_blackhole_if_possible(method);
+  CompilerOracle::tag_blackhole_if_possible(method, CompLevel::CompLevel_full_optimization);
 
   jmetadata handle = _runtime->allocate_handle(method);
   jboolean exception = false;
