@@ -185,7 +185,8 @@ int CompilerDirectives::refcount() {
 DirectiveSet* CompilerDirectives::get_for(int comp_level) {
   assert(DirectivesStack_lock->owned_by_self(), "");
   if (comp_level >= CompLevel::CompLevel_full_optimization) {
-    return _c2_store;
+    JVMCI_ONLY(return _c1_store;)
+    NOT_JVMCI(return _c2_store;)
   } else {
     // use c1_store as default
     return _c1_store;
