@@ -70,7 +70,8 @@ class os::win32 {
   static void   setmode_streams();
   static bool   is_windows_11_or_greater();
   static bool   is_windows_server_2022_or_greater();
-  static DWORD  system_logical_processor_count();
+  static bool   request_lock_memory_privilege();
+  static size_t large_page_init_decide_size();
   static int windows_major_version() {
     initialize_windows_version();
     return _major_version;

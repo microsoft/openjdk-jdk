@@ -3063,7 +3063,7 @@ class NUMANodeListHolder {
 
 static size_t _large_page_size = 0;
 
-static bool request_lock_memory_privilege() {
+bool os::win32::request_lock_memory_privilege() {
   HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE,
                                 os::current_process_id());
 
@@ -3247,7 +3247,7 @@ static char* allocate_pages_individually(size_t bytes, char* addr, DWORD flags,
   return p_buf;
 }
 
-size_t os::large_page_init_decide_size() {
+size_t os::win32::large_page_init_decide_size() {
   // print a warning if any large page related flag is specified on command line
   bool warn_on_failure = !FLAG_IS_DEFAULT(UseLargePages) ||
                          !FLAG_IS_DEFAULT(LargePageSizeInBytes);
@@ -3255,7 +3255,7 @@ size_t os::large_page_init_decide_size() {
 #define WARN(msg) if (warn_on_failure) { warning(msg); }
 #define WARN1(msg,p) if (warn_on_failure) { warning(msg,p); }
 
-  if (!request_lock_memory_privilege()) {
+  if (!os::win32::request_lock_memory_privilege()) {
     WARN("JVM cannot use large page memory because it does not have enough privilege to lock pages in memory.");
     return 0;
   }
@@ -3284,18 +3284,8 @@ size_t os::large_page_init_decide_size() {
 #endif
   }
 
-  if (LargePageSizeInBytes > 0) {
-    if (LargePageSizeInBytes % size == 0) {
-      size = LargePageSizeInBytes;
-    } else {
-      char buffer[256];
-      snprintf(buffer, sizeof(buffer), "The specified large page size (%d) is not a multiple of the minimum large page size (%d), defaulting to minimum page size.", LargePageSizeInBytes, size);
-      WARN1("%s", buffer);
-    }
-  } else {
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer), "The JVM cannot use large pages because the large page size setting is not configured, defaulting to minimum page size (%d).", size);
-    WARN1("%s", buffer);
+  if (LargePageSizeInBytes > 0 && LargePageSizeInBytes % size == 0) {
+    size = LargePageSizeInBytes;
   }
 
 #undef WARN
@@ -3309,23 +3299,12 @@ void os::large_page_init() {
     return;
   }
 
-  _large_page_size = os::large_page_init_decide_size();
+  _large_page_size = large_page_init_decide_size();
   const size_t default_page_size = os::vm_page_size();
   if (_large_page_size > default_page_size) {
-#if !defined(IA32)
-    if ((os::win32::is_windows_11_or_greater() || os::win32::is_windows_server_2022_or_greater()) && EnableAllLargePageSizesForWindows) {
-      size_t min_size = GetLargePageMinimum();
-
-      // Populate _page_sizes with large page sizes less than or equal to _large_page_size, ensuring each page size is double the size of the previous one.
-      for (size_t page_size = min_size; page_size < _large_page_size; page_size *= 2) {
-        _page_sizes.add(page_size);
-      }
-    }
-#endif
-
     _page_sizes.add(_large_page_size);
   }
-  // Set UseLargePages based on whether a large page size was successfully determined
+
   UseLargePages = _large_page_size != 0;
 }
 
