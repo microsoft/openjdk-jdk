@@ -463,8 +463,15 @@ bool ConnectionGraph::compute_escape() {
 // if at least one scalar replaceable allocation participates in the merge.
 bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
   bool found_sr_allocate = false;
-
+  int nof_input_phi_nodes = 0;
   for (uint i = 1; i < ophi->req(); i++) {
+    if (ophi->in(i)->is_Phi()) {
+      // ignore phi node with more than one input phi nodes
+      if (++nof_input_phi_nodes > 1) {
+        NOT_PRODUCT(if (TraceReduceAllocationMerges && !found_sr_allocate) tty->print_cr("Cannot reduce Phi %d. More than one input phi node.", ophi->_idx);)
+        return false;
+      }
+    }
     JavaObjectNode* ptn = unique_java_object(ophi->in(i));
     if (ptn != nullptr && ptn->scalar_replaceable()) {
       AllocateNode* alloc = ptn->ideal_node()->as_Allocate();
@@ -527,11 +534,12 @@ bool ConnectionGraph::has_been_reduced(PhiNode* n, SafePointNode* sfpt) const {
 //  - Phi -> AddP -> Load
 //  - Phi -> CastPP -> SafePoints
 //  - Phi -> CastPP -> AddP -> Load
-bool ConnectionGraph::can_reduce_check_users(Node* n, uint phiNestLevel) const {
+//  - Phi -> Phi -> AddP -> Load
+bool ConnectionGraph::can_reduce_check_users(Node* n, uint phi_nest_level) const {
   for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
     Node* use = n->fast_out(i);
-
-    if (use->is_SafePoint() && phiNestLevel == 0) {
+    // Skip Phi -> Phi -> SafePoints and allow only Phi -> SafePoints, Phi -> CastPP -> SafePoints, 
+    if (use->is_SafePoint() && (!n->is_Phi() || phi_nest_level < 1)) {
       if (use->is_Call() && use->as_Call()->has_non_debug_use(n)) {
         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. Call has non_debug_use().", n->_idx, _invocation);)
         return false;
@@ -539,35 +547,33 @@ bool ConnectionGraph::can_reduce_check_users(Node* n, uint phiNestLevel) const {
         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. It has already been reduced.", n->_idx, _invocation);)
         return false;
       }
-    } else if (use->is_AddP() && phiNestLevel <= 1) {
+    } else if (use->is_AddP()) {
+      assert(phi_nest_level <= 1, "unexpected nesting level");
       Node* addp = use;
       for (DUIterator_Fast jmax, j = addp->fast_outs(jmax); j < jmax; j++) {
         Node* use_use = addp->fast_out(j);
         const Type* load_type = _igvn->type(use_use);
 
-        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn, (phiNestLevel > 0))) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", n->_idx, _invocation, use_use->Name());)
+        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn, (phi_nest_level > 0))) {
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce %s Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", (phi_nest_level > 0)?"nested":"", n->_idx, _invocation, use_use->Name());)
           return false;
         } else if (load_type->isa_narrowklass() || load_type->isa_klassptr()) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. [Narrow] Klass Load: %s", n->_idx, _invocation, use_use->Name());)
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce %s Phi %d on invocation %d. [Narrow] Klass Load: %s", (phi_nest_level > 0)?"nested":"", n->_idx, _invocation, use_use->Name());)
           return false;
         }
       }
-    } else if (phiNestLevel > 0) {
-      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. Unsupported user %s at nesting level %d.", n->_idx, _invocation, use->Name(), phiNestLevel);)
+    } else if (phi_nest_level > 0) {
+      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. Unsupported user %s at nesting level %d.", n->_idx, _invocation, use->Name(), phi_nest_level);)
       return false;
     } else if (use->is_Phi()) {
       if (n->_idx == use->_idx) {
         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Self loop nested Phi");)
         return false;
-      } else {
-        if (!can_reduce_check_users(use->as_Phi(), phiNestLevel+1)) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce nested Phi %d ", use->_idx);)
-          return false;
-        } else {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can reduce nested Phi %d ", use->_idx);)
-       }
+      } else if (!can_reduce_phi_check_inputs(use->as_Phi()) || !can_reduce_check_users(use->as_Phi(), phi_nest_level+1)) {
+        return false;
       }
+      //test
+      tty->print_cr("Can reduce parent Phi %d child phi %d .", n->_idx, use->_idx);
     } else if (use->is_CastPP()) {
       const Type* cast_t = _igvn->type(use);
       if (cast_t == nullptr || cast_t->make_ptr()->isa_instptr() == nullptr) {
@@ -602,7 +608,7 @@ bool ConnectionGraph::can_reduce_check_users(Node* n, uint phiNestLevel) const {
         }
       }
 
-      if (!can_reduce_check_users(use, phiNestLevel+1)) {
+      if (!can_reduce_check_users(use, phi_nest_level+1)) {
         return false;
       }
     } else if (use->Opcode() == Op_CmpP || use->Opcode() == Op_CmpN) {
@@ -638,7 +644,7 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
     return false;
   }
 
-  if (!can_reduce_phi_check_inputs(ophi) || !can_reduce_check_users(ophi, /* phiNestLevel: */ 0)) {
+  if (!can_reduce_phi_check_inputs(ophi) || !can_reduce_check_users(ophi, /* phi_nest_level: */ 0)) {
     return false;
   }
 
@@ -1283,18 +1289,25 @@ bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, No
 }
 
 void ConnectionGraph::reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist, Unique_Node_List &reducible_merges) {
+
   Unique_Node_List nested_phis;
-  // Collect nested phi nodes
+  // Collect nested phi nodes first because the graph will change while splitting the child/nested phi node.
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
-    if (use->is_Phi() && use->_idx != ophi->_idx)  {
+    if (use->is_Phi()) {
+      assert(use->_idx != ophi->_idx, "Unexpected selfloop Phi.");
       nested_phis.push(use);
     }
   }
+  
+  if (nested_phis.size() > 1) {
+    tty->print_cr("parent Phi nodes %d", nested_phis.size());
+    ophi->dump(3);
+    ophi->dump(-3);
+  }
 
-  // Processing child phi nodes ahead of parent phi nodes in nested scenarios is crucial.
-  // This sequence guarantees that optimizations and splits are applied to child phi nodes in the 
-  // optimal graph configuration before the reduction process involving parent phi nodes takes place.
+  // Splitting through the child phi nodes ahead of parent phi nodes in nested scenarios is crucial.
+  // Ensure that the splits are applied to the load fields of child phi nodes before the parent phi nodes take place.
   for (uint i = 0; i < nested_phis.size(); i++) {
     Node *nested_phi = nested_phis.at(i);
     reduce_phi(nested_phi->as_Phi(), alloc_worklist, memnode_worklist, reducible_merges);
@@ -2964,7 +2977,7 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
           continue;
         }
 
-        if (ReduceAllocationMerges && use_n->is_Phi() && can_reduce_phi(use_n->as_Phi())) {
+        if (use_n->is_Phi() && can_reduce_phi(use_n->as_Phi())) {
           candidates.push(use_n);
         } else {
           // Mark all objects as NSR if we can't remove the merge

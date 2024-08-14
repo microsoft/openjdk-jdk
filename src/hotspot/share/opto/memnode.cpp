@@ -1621,20 +1621,16 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
   }
 
   if (nested) {
-    Node *parent_phi = nullptr;
-    // find parent phi node for nestedphi
     for (uint i = 1; i < base->req(); i++) {
       if (base->in(i)->is_Phi()) {
-        parent_phi = base->in(i);
-        Node *mem_node_for_load_after_opt = get_memory_node_for_nestedphi_after_split(phase, base, parent_phi);
-        if (!mem_node_for_load_after_opt || !can_split_through_phi_helper(parent_phi, mem_node_for_load_after_opt)) {
+        // base->in(i) is the parent phi node for base node.
+        Node *mem_node_for_load_after_opt = get_memory_node_for_nestedphi_after_split(phase, base, i);
+        if (!mem_node_for_load_after_opt || !can_split_through_phi_helper(base->in(i), mem_node_for_load_after_opt)) {
           return false;
         }
-        break;
       }
     }
   }
-
   return true;
 }
 
@@ -1643,62 +1639,27 @@ bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
 // and returns the memory node of the new load field node that is attached to the parentphi node.
 // Note that this function doesn't actually perform the split.
 // If a split is impossible, it returns nullptr.
-
-Node* LoadNode::get_memory_node_for_nestedphi_after_split(PhaseGVN* phase, Node *basephi, Node* base_parentphi) {
+Node* LoadNode::get_memory_node_for_nestedphi_after_split(PhaseGVN* phase, Node *base, uint parent_idx) {
   Node* mem        = in(Memory);
-  Node *address    = in(Address);
-  const TypeOopPtr *t_oop = phase->type(address)->isa_oopptr();  
-  assert(basephi != nullptr && basephi->is_Phi(), "sanity");
-  assert(base_parentphi != nullptr && base_parentphi->is_Phi(), "sanity");
-  Node* region = get_region_of_split_through_base_phi(basephi);
+  Node* region = get_region_of_split_through_base_phi(base);
   if (region == nullptr) {
-    return nullptr;    
+    tty->print_cr("region null");
+    return nullptr;
+  }
+  
+  Node* in = region->in(parent_idx);
+  if (region->is_CountedLoop() && region->as_Loop()->is_strip_mined() && parent_idx == LoopNode::EntryControl &&
+    in != nullptr && in->is_OuterStripMinedLoop()) {
+    // No node should go in the outer strip mined loop
+    in = in->in(LoopNode::EntryControl);
+  }
+  if (in == nullptr || in == phase->C->top()) {
+    // Dead path?  Use a dead data op    
+    return phase->C->top()->in(Memory);
+  } else if (mem->is_Phi() && (mem->in(0) == region)) {
+    return mem->in(parent_idx);
   }
 
-  Compile* C = phase->C;
-  if (mem->is_Phi()) {
-    if (!stable_phi(mem->as_Phi(), phase)) {
-      return nullptr; // Wait stable graph
-    }
-    uint cnt = mem->req();
-    // Check for loop invariant memory.
-    if (cnt == 3) {
-      for (uint i = 1; i < cnt; i++) {
-        Node* in = mem->in(i);
-        Node*  m = optimize_memory_chain(in, t_oop, this, phase);
-        if (m == mem) {
-          if (i == 1) {
-            // if the first edge was a loop, check second edge too.
-            // If both are replaceable - we are in an infinite loop
-            Node *n = optimize_memory_chain(mem->in(2), t_oop, this, phase);
-            if (n == mem) {
-              break;
-            }
-          }
-          return mem->in(cnt - i); // made change
-        }
-      }
-    }
-  }
-
-  for (uint i = 1; i < region->req(); i++) {
-    Node* in = region->in(i);
-    // return node only for parent phi of nested phi node
-    if (basephi->in(i) != base_parentphi) {
-      continue;
-    }
-    if (region->is_CountedLoop() && region->as_Loop()->is_strip_mined() && i == LoopNode::EntryControl &&
-      in != nullptr && in->is_OuterStripMinedLoop()) {
-      // No node should go in the outer strip mined loop
-      in = in->in(LoopNode::EntryControl);
-    }
-    if (in == nullptr || in == C->top()) {
-      // Dead path?  Use a dead data op
-      return C->top()->in(Memory);
-    } else if (mem->is_Phi() && (mem->in(0) == region)) {
-      return mem->in(i);
-    }
-  }
   return mem;
 }
 
@@ -1738,7 +1699,7 @@ Node* LoadNode::split_through_phi(PhaseGVN* phase, bool ignore_missing_instance_
     }
     uint cnt = mem->req();
     // Check for loop invariant memory.
-    if (cnt == 3) {
+    if (cnt == 3 && !ignore_missing_instance_id) {
       for (uint i = 1; i < cnt; i++) {
         Node* in = mem->in(i);
         Node*  m = optimize_memory_chain(in, t_oop, this, phase);

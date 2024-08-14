@@ -252,7 +252,7 @@ public:
 
   // Returns a memory node for load node after spliting through nestedphi node
   // Calling code is responsible to clean up (remove_dead_node) after use
-  Node* get_memory_node_for_nestedphi_after_split(PhaseGVN* phase, Node *basephi, Node* base_parentphi);
+  Node* get_memory_node_for_nestedphi_after_split(PhaseGVN* phase, Node *base, uint parent_idx);
   Node* get_region_of_split_through_base_phi(Node *base);
 
   // Split instance field load through Phi.

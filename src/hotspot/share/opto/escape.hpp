@@ -602,7 +602,7 @@ private:
   bool can_reduce_cmp(Node* n, Node* cmp) const;
   bool has_been_reduced(PhiNode* n, SafePointNode* sfpt) const;
   bool can_reduce_phi(PhiNode* ophi) const;
-  bool can_reduce_check_users(Node* n, uint phiNestLevel) const;
+  bool can_reduce_check_users(Node* n, uint phi_nest_level) const;
   bool can_reduce_phi_check_inputs(PhiNode* ophi) const;
 
   void reduce_phi_on_field_access(Node* previous_addp, GrowableArray<Node *>  &alloc_worklist, Unique_Node_List &reducible_merges);
