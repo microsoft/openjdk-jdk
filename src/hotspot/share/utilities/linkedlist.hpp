@@ -160,6 +160,16 @@ template <class E, AnyObj::allocation_type T = AnyObj::C_HEAP,
     }
   }
 
+  // TODO: make efficient
+  virtual LinkedListNode<E>* tail() {
+    LinkedListNode<E>* p = this->head();
+    while (p != nullptr && p->next() != nullptr) {
+      p = p->next();
+    }
+
+    return p;
+  }
+
   // Add an entry to the linked list
   virtual LinkedListNode<E>* add(const E& e)  {
     LinkedListNode<E>* node = this->new_node(e);

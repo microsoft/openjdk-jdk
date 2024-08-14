@@ -30,6 +30,7 @@
 #include "gc/shared/gcLocker.hpp"
 #include "gc/shared/gcTimer.hpp"
 #include "gc/shared/gcTrace.hpp"
+#include "gc/shared/genArguments.hpp"
 #include "gc/shared/space.hpp"
 #include "gc/shared/spaceDecorator.hpp"
 #include "logging/log.hpp"
@@ -39,12 +40,23 @@
 #include "utilities/copy.hpp"
 #include "utilities/events.hpp"
 
-Generation::Generation(ReservedSpace rs, size_t initial_size) :
+Generation::Generation(ReservedSpace rs, size_t initial_size, size_t min_commit_size) :
   _gc_manager(nullptr) {
   if (!_virtual_space.initialize(rs, initial_size)) {
-    vm_exit_during_initialization("Could not reserve enough space for "
-                    "object heap");
+    if (!UseSerialGCOverheadErgonomics) {
+      vm_exit_during_initialization("Could not reserve enough space for "
+                      "object heap");
+    }
+
+    assert(min_commit_size > 0, "min_commit_size must be greater than 0");
+    bool committed = _virtual_space.expand_by(min_commit_size);
+
+    if (!committed) {
+      vm_exit_during_initialization("Could not reserve enough space for "
+                      "object heap");
+    }
   }
+
   // Mangle all of the initial generation.
   if (ZapUnusedHeapArea) {
     MemRegion mangle_region((HeapWord*)_virtual_space.low(),

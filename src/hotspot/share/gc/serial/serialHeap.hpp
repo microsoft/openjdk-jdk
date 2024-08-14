@@ -25,8 +25,10 @@
 #ifndef SHARE_GC_SERIAL_SERIALHEAP_HPP
 #define SHARE_GC_SERIAL_SERIALHEAP_HPP
 
+#include "gc/serial/adaptiveHeapSizeManager.hpp"
 #include "gc/serial/defNewGeneration.hpp"
 #include "gc/serial/generation.hpp"
+#include "gc/serial/gcOverheadTracker.hpp"
 #include "gc/serial/tenuredGeneration.hpp"
 #include "gc/shared/collectedHeap.hpp"
 #include "gc/shared/oopStorageParState.hpp"
@@ -84,6 +86,8 @@ private:
   CardTableRS* _rem_set;
 
   GCPolicyCounters* _gc_policy_counters;
+  GCOverheadTracker* _gc_overhead_tracker;
+  AdaptiveHeapSizeManager* _adaptive_heap_size_manager;
 
   bool do_young_collection(bool clear_soft_refs);
 

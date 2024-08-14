@@ -218,6 +218,9 @@ class DefNewGeneration: public Generation {
 
   // GC support
   void compute_new_size();
+  bool adjust_size(size_t desired_eden_size, size_t desired_survivor_size, size_t max_eden_capacity);
+  void set_space_boundaries(size_t eden_size, size_t survivor_size, bool clear_space, bool mangle_space);
+  size_t committed_size() const;
 
   bool collect(bool clear_all_soft_refs);
 

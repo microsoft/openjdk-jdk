@@ -35,6 +35,21 @@
           "When disabled, informs the GC to shrink the java heap directly"  \
           " to the target size at the next full GC rather than requiring"   \
           " smaller steps during multiple full GCs.")                       \
+                                                                            \
+  product(bool, UseSerialGCOverheadErgonomics, false,                       \
+          "When enabled, informs the GC to use CPU overhead to determine "  \
+          " the heap size while respecting any Xms and Xmx sizes set on "   \
+          " the command line. This also overrides the GCInterval? flag.")   \
+                                                                            \
+  product(uint, SerialGCOverheadTarget, 5,                                  \
+          "The CPU overhead value that GC should target by adjusting "      \
+          " heap size")                                                     \
+          range(1, 100)                                                     \
+                                                                            \
+  product(uintx, GCOverheadWindowDurationMins, 5,                           \
+          "The time window over which GC overhead is computed when the"     \
+          " UseSerialGCOverheadErgonomics flag is enabled.")                \
+          range(1, max_uintx)                                               \
 
 // end of GC_SERIAL_FLAGS
 

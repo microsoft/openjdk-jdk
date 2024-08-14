@@ -75,7 +75,7 @@ class Generation: public CHeapObj<mtGC> {
   CollectorCounters* _gc_counters;
 
   // Initialize the generation.
-  Generation(ReservedSpace rs, size_t initial_byte_size);
+  Generation(ReservedSpace rs, size_t initial_byte_size, size_t min_commit_size);
 
  public:
   enum SomePublicConstants {

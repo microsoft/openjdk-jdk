@@ -124,6 +124,71 @@ void GCArguments::initialize_heap_flags_and_sizes() {
     }
   }
 
+  if (UseSerialGC && UseSerialGCOverheadErgonomics) {
+    if (!FLAG_IS_CMDLINE(MaxRAMPercentage)) {
+      FLAG_SET_ERGO(MaxRAMPercentage, 100);
+    }
+
+    if (FLAG_IS_CMDLINE(GCTimeLimit)) {
+      warning("The GCTimeLimit command line option is ignored when UseSerialGCOverheadErgonomics is enabled.");
+    }
+
+    if (FLAG_IS_CMDLINE(MinHeapFreeRatio)) {
+      warning("The MinHeapFreeRatio command line option is ignored when UseSerialGCOverheadErgonomics is enabled.");
+    }
+
+    if (FLAG_IS_CMDLINE(MaxHeapFreeRatio)) {
+      warning("The MaxHeapFreeRatio command line option is ignored when UseSerialGCOverheadErgonomics is enabled.");
+    }
+
+    if (FLAG_IS_CMDLINE(SurvivorRatio)) {
+      warning("The SurvivorRatio command line option is ignored when UseSerialGCOverheadErgonomics is enabled.");
+    }
+
+    if (FLAG_IS_CMDLINE(MinSurvivorRatio)) {
+      warning("The MinSurvivorRatio command line option is ignored when UseSerialGCOverheadErgonomics is enabled.");
+    }
+
+    if (FLAG_IS_CMDLINE(NewRatio)) {
+      warning("The NewRatio command line option is ignored when UseSerialGCOverheadErgonomics is enabled.");
+    }
+
+    if (!FLAG_IS_CMDLINE(TargetSurvivorRatio)) {
+      FLAG_SET_ERGO(TargetSurvivorRatio, 50);
+    }
+
+    // NewRatio affects the initial generation size.
+    // See https://github.com/openjdk/jdk/blob/a5d948fb9841f654cccc9567c60e8d28e7d719ae/src/hotspot/share/gc/shared/genArguments.cpp#L232-L240
+    FLAG_SET_ERGO(NewRatio, 1);
+
+    // Let eden and each of the survivor spaces start out with identical sizes
+    FLAG_SET_ERGO(SurvivorRatio, 1);
+
+    if (!FLAG_IS_CMDLINE(MaxHeapSize)) {
+      // Set MaxHeapSize to the physical memory on the machine.
+      size_t max_heap_size_bytes = ((double)MaxRAMPercentage) / 100 * os::physical_memory();
+
+      // This should not be an issue with the heap sizes that result in the serial collector
+      // being ergonomically selected at startup. However, the user can explicitly request
+      // the serial collector using the -XX:+UseSerialGC flag and specify larger heap sizes.
+      if (UseCompressedOops) {
+        auto max_heap_for_compressed_oops = Arguments::max_heap_for_compressed_oops();
+        // TODO: Verify that Arguments::max_heap_for_compressed_oops() is safe to invoke by this point
+        // Use half of max_heap_for_compressed_oops so that the total reserved by the SerialHeap
+        // (the sum of the young and tenured generations) is max_heap_for_compressed_oops 
+        max_heap_size_bytes = MIN2(max_heap_for_compressed_oops / 2, max_heap_size_bytes);
+      }
+
+      size_t aligned_max_heap_size_bytes = align_down(max_heap_size_bytes, HeapAlignment);
+      FLAG_SET_ERGO(MaxHeapSize, aligned_max_heap_size_bytes);
+    }
+
+    // Enable the young generation to theoretically expand to the max heap size
+    if (!FLAG_IS_CMDLINE(MaxNewSize)) {
+      FLAG_SET_ERGO(MaxNewSize, MaxHeapSize);
+    }
+  }
+
   if (FLAG_IS_CMDLINE(InitialHeapSize) && FLAG_IS_CMDLINE(MinHeapSize) &&
       InitialHeapSize < MinHeapSize) {
     vm_exit_during_initialization("Incompatible minimum and initial heap sizes specified");

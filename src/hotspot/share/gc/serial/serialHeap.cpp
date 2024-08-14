@@ -101,6 +101,7 @@ SerialHeap::SerialHeap() :
     _old_pool(nullptr) {
   _young_manager = new GCMemoryManager("Copy");
   _old_manager = new GCMemoryManager("MarkSweepCompact");
+  _gc_overhead_tracker = new GCOverheadTracker();
 }
 
 void SerialHeap::initialize_serviceability() {
@@ -175,6 +176,10 @@ void SerialHeap::unpin_object(JavaThread* thread, oop obj) {
 }
 
 jint SerialHeap::initialize() {
+  if (UseSerialGCOverheadErgonomics) {
+    log_info(gc)("Serial collector GC overhead ergonomics enabled. SerialGCOverheadTarget: %d GCOverheadWindowDurationMins: %lu", SerialGCOverheadTarget, GCOverheadWindowDurationMins);
+  }
+
   // Allocate space for the heap.
 
   ReservedHeapSpace heap_rs = allocate(HeapAlignment);
@@ -199,6 +204,7 @@ jint SerialHeap::initialize() {
 
   _young_gen = new DefNewGeneration(young_rs, NewSize, MinNewSize, MaxNewSize);
   _old_gen = new TenuredGeneration(old_rs, OldSize, MinOldSize, MaxOldSize, rem_set());
+  _adaptive_heap_size_manager = new AdaptiveHeapSizeManager(_young_gen, _old_gen);
 
   GCInitLogger::print();
 
@@ -212,11 +218,16 @@ ReservedHeapSpace SerialHeap::allocate(size_t alignment) {
   const size_t pageSize = UseLargePages ? os::large_page_size() : os::vm_page_size();
   assert(alignment % pageSize == 0, "Must be");
 
-  // Check for overflow.
-  size_t total_reserved = MaxNewSize + MaxOldSize;
-  if (total_reserved < MaxNewSize) {
-    vm_exit_during_initialization("The size of the object heap + VM data exceeds "
-                                  "the maximum representable size");
+  // MaxNewSize and MaxOldSize have each been set to MaxHeapSize if
+  // UseSerialGCOverheadErgonomics is enabled.
+  size_t total_reserved;
+
+  if (UseSerialGCOverheadErgonomics) {
+    // We are not maintaining a fixed ratio between the young and tenured
+    // generations. Each can grow up to MaxHeapSize as the other shrinks.
+    total_reserved = MaxHeapSize * 2;
+  } else {
+    total_reserved = MaxNewSize + MaxOldSize;
   }
   assert(total_reserved % alignment == 0,
          "Gen size; total_reserved=" SIZE_FORMAT ", alignment="
@@ -446,6 +457,11 @@ bool SerialHeap::do_young_collection(bool clear_soft_refs) {
   if (!is_young_gc_safe()) {
     return false;
   }
+
+  if (UseSerialGCOverheadErgonomics) {
+    _gc_overhead_tracker->start_young_collection();
+  }
+
   IsSTWGCActiveMark gc_active_mark;
   SvcGCMarker sgcm(SvcGCMarker::MINOR);
   GCIdMark gc_id_mark;
@@ -478,6 +494,16 @@ bool SerialHeap::do_young_collection(bool clear_soft_refs) {
 
   if (should_verify && VerifyAfterGC) {
     Universe::verify("After GC");
+  }
+
+  if (UseSerialGCOverheadErgonomics) {
+    /*
+    // Survivor use percentages can be computed here if necessary
+    size_t pre_gc_survivor_used_percent = 100 * pre_gc_values.from_used / pre_gc_values.from_capacity;
+    int gc_survivor_used_percent = int(100 * from()->used() / from()->capacity();
+    */
+
+    _gc_overhead_tracker->end_young_collection(result);
   }
 
   _young_gen->compute_new_size();
@@ -713,6 +739,10 @@ void SerialHeap::do_full_collection(bool clear_all_soft_refs) {
 }
 
 void SerialHeap::do_full_collection_no_gc_locker(bool clear_all_soft_refs) {
+  if (UseSerialGCOverheadErgonomics) {
+    _gc_overhead_tracker->start_full_collection();
+  }
+
   IsSTWGCActiveMark gc_active_mark;
   SvcGCMarker sgcm(SvcGCMarker::FULL);
   GCIdMark gc_id_mark;
@@ -756,9 +786,34 @@ void SerialHeap::do_full_collection_no_gc_locker(bool clear_all_soft_refs) {
   CodeCache::arm_all_nmethods();
   COMPILER2_OR_JVMCI_PRESENT(DerivedPointerTable::update_pointers());
 
+  int gc_overhead = -1;
+  bool gc_overhead_valid = false;
+
+  if (UseSerialGCOverheadErgonomics) {
+    gc_overhead = _gc_overhead_tracker->end_full_collection();
+    if (_gc_overhead_tracker->completed_full_collections() > 1) {
+      assert(gc_overhead >= 0, "GC overhead must not be negative");
+      assert(gc_overhead <= 100, "GC overhead must not exceed 100");
+      gc_overhead_valid = (gc_overhead >= 0) && (gc_overhead <= 100);
+
+      if (!gc_overhead_valid) {
+        log_warning(gc)("Invalid GC overhead value. Falling back to default heap size computation.");
+      }
+    }
+  }
+
   // Adjust generation sizes.
-  _old_gen->compute_new_size();
-  _young_gen->compute_new_size();
+  if (UseSerialGCOverheadErgonomics && gc_overhead_valid) {
+    // Need to ensure that MaxNewSize and MaxOldSize are set to a value that matches the total amount of memory on the machine.
+    // Compute the overall size of the heap taking into account memory pressure
+    // Ergonomically set OldSize and NewSize
+    _adaptive_heap_size_manager->resize_heap_for_target_gc_overhead(gc_overhead);
+  } else {
+    _old_gen->compute_new_size();
+    _young_gen->compute_new_size();
+  }
+
+  // TODO: Shouldn't all this other work be included in GC overhead calculation?
 
   // Delete metaspaces for unloaded class loaders and clean up loader_data graph
   ClassLoaderDataGraph::purge(/*at_safepoint*/true);

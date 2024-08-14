@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "gc/serial/adaptiveHeapSizing.hpp"
 #include "gc/serial/cardTableRS.hpp"
 #include "gc/serial/serialBlockOffsetTable.inline.hpp"
 #include "gc/serial/serialFullGC.hpp"
@@ -290,7 +291,7 @@ TenuredGeneration::TenuredGeneration(ReservedSpace rs,
                                      size_t min_byte_size,
                                      size_t max_byte_size,
                                      CardTableRS* remset) :
-  Generation(rs, initial_byte_size), _rs(remset),
+  Generation(rs, initial_byte_size, MinOldSize), _rs(remset),
   _min_heap_delta_bytes(), _capacity_at_prologue(),
   _used_at_prologue()
 {
@@ -352,6 +353,42 @@ void TenuredGeneration::compute_new_size() {
   const size_t capacity_after_gc = capacity();
 
   compute_new_size_inner();
+
+  assert(used() == used_after_gc && used_after_gc <= capacity(),
+         "used: " SIZE_FORMAT " used_after_gc: " SIZE_FORMAT
+         " capacity: " SIZE_FORMAT, used(), used_after_gc, capacity());
+}
+
+size_t TenuredGeneration::committed_size() const {
+  return _virtual_space.committed_size();
+}
+
+void TenuredGeneration::adjust_size(size_t target_size) {
+  assert_locked_or_safepoint(Heap_lock);
+
+  const size_t used_after_gc = used();
+  const size_t capacity_after_gc = capacity();
+
+  if (capacity_after_gc < target_size) {
+    // If we have less free space than we want then expand
+    size_t expand_bytes = target_size - capacity_after_gc;
+    bool success = expand(expand_bytes, 0); // safe if expansion fails
+    log_debug(gc, heap, ergo)(SERIAL_GC_AHS_PREFIX "    expanding tenured:  target_size: %6.1fK  expand_bytes: %6.1fK (success = %d)",
+      target_size / (double) K,
+      expand_bytes / (double) K,
+      success);
+    return;
+  }
+
+  size_t min_size_after_shrink = MAX2(used_after_gc, target_size);
+  if (capacity_after_gc > min_size_after_shrink) {
+    // Capacity too large, compute shrinking size
+    size_t shrink_bytes = capacity_after_gc - target_size;
+    log_debug(gc, heap, ergo)(SERIAL_GC_AHS_PREFIX "    shrinking tenured:  capacity_after_gc: %.1fK  target_size: %.1fK  used_after_gc: %.1fK",
+                              capacity_after_gc / (double) K, target_size / (double) K, used_after_gc / (double) K);
+
+    shrink(shrink_bytes);
+  }
 
   assert(used() == used_after_gc && used_after_gc <= capacity(),
          "used: " SIZE_FORMAT " used_after_gc: " SIZE_FORMAT

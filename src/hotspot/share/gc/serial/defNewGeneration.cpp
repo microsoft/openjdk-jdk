@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "gc/serial/adaptiveHeapSizing.hpp"
 #include "gc/serial/cardTableRS.hpp"
 #include "gc/serial/serialGcRefProcProxyTask.hpp"
 #include "gc/serial/serialHeap.inline.hpp"
@@ -39,6 +40,8 @@
 #include "gc/shared/gcTimer.hpp"
 #include "gc/shared/gcTrace.hpp"
 #include "gc/shared/gcTraceTime.inline.hpp"
+#include "gc/shared/genArguments.hpp"
+#include "gc/shared/preservedMarks.inline.hpp"
 #include "gc/shared/referencePolicy.hpp"
 #include "gc/shared/referenceProcessorPhaseTimes.hpp"
 #include "gc/shared/space.hpp"
@@ -225,7 +228,7 @@ DefNewGeneration::DefNewGeneration(ReservedSpace rs,
                                    size_t min_size,
                                    size_t max_size,
                                    const char* policy)
-  : Generation(rs, initial_size),
+  : Generation(rs, initial_size, MinNewSize),
     _promotion_failed(false),
     _promo_failure_drain_in_progress(false),
     _string_dedup_requests()
@@ -413,6 +416,100 @@ size_t DefNewGeneration::adjust_for_thread_increase(size_t new_size_candidate,
   }
 
   return desired_new_size;
+}
+
+size_t DefNewGeneration::committed_size() const {
+  return _virtual_space.committed_size();
+}
+
+void DefNewGeneration::set_space_boundaries(size_t eden_size, size_t survivor_size, bool clear_space, bool mangle_space) {
+  assert(to()->is_empty() && from()->is_empty(), "Initialization of the survivor spaces assumes these are empty");
+  assert(eden_size > 0 && survivor_size <= eden_size, "just checking");
+
+  char *eden_start = _virtual_space.low();
+  char *from_start = eden_start + eden_size;
+  char *to_start   = from_start + survivor_size;
+  char *to_end     = to_start   + survivor_size;
+
+  assert(to_end == _virtual_space.high(), "just checking");
+  assert(is_aligned(eden_start, SpaceAlignment), "checking alignment");
+  assert(is_aligned(from_start, SpaceAlignment), "checking alignment");
+  assert(is_aligned(to_start, SpaceAlignment),   "checking alignment");
+
+  MemRegion edenMR((HeapWord*)eden_start, (HeapWord*)from_start);
+  MemRegion fromMR((HeapWord*)from_start, (HeapWord*)to_start);
+  MemRegion toMR  ((HeapWord*)to_start, (HeapWord*)to_end);
+
+  // Reset the spaces for their new regions.
+  eden()->initialize(edenMR,
+                     clear_space,
+                     SpaceDecorator::Mangle);
+  // If clear_space, we will not have cleared any
+  // portion of eden above its top. This can cause newly
+  // expanded space not to be mangled if using ZapUnusedHeapArea.
+  // We explicitly do such mangling here.
+  if (ZapUnusedHeapArea && clear_space && mangle_space) {
+    eden()->mangle_unused_area();
+  }
+  from()->initialize(fromMR, clear_space, mangle_space);
+  to()->initialize(toMR, clear_space, mangle_space);
+}
+
+bool DefNewGeneration::adjust_size(size_t desired_eden_size, size_t desired_survivor_size, size_t max_eden_capacity) {
+  if (!from()->is_empty() || !to()->is_empty()) {
+    log_debug(gc, ergo, heap)(
+        SERIAL_GC_AHS_PREFIX "Skipping young gen size adjustment. from space empty: %d, to space empty: %d.",
+        from()->is_empty(),
+        to()->is_empty());
+
+    assert(false, "size adjustment must not be skipped");
+    return false;
+  }
+
+  assert(eden()->is_empty(), "eden must be empty when adjusting eden and survivor space sizes");
+
+  size_t alignment = Generation::GenGrain;
+  size_t new_size_before = _virtual_space.committed_size();
+  size_t desired_new_size = desired_eden_size + (2 * desired_survivor_size);
+
+  bool changed = false;
+  if (desired_new_size > new_size_before) {
+    size_t change = desired_new_size - new_size_before;
+    assert(change % alignment == 0, "just checking");
+    log_debug(gc, ergo, heap)(SERIAL_GC_AHS_PREFIX "Expanding young gen by " SIZE_FORMAT " bytes (desired new size is " SIZE_FORMAT ").", change, desired_new_size);
+    if (expand(change)) {
+       changed = true;
+    }
+    // If the heap failed to expand to the desired size,
+    // "changed" will be false.  If the expansion failed
+    // (and at this point it was expected to succeed),
+    // ignore the failure (leaving "changed" as false).
+  } else if (desired_new_size < new_size_before) {
+    size_t change = new_size_before - desired_new_size;
+    assert(change % alignment == 0, "just checking");
+    log_debug(gc, ergo, heap)(SERIAL_GC_AHS_PREFIX "Shrinking young gen by " SIZE_FORMAT " bytes (desired new size is " SIZE_FORMAT ").", change, desired_new_size);
+    _virtual_space.shrink_by(change);
+    changed = true;
+  }
+
+  if (changed) {
+    // The spaces have already been mangled at this point but
+    // may not have been cleared (set top = bottom) and should be.
+    // Mangling was done when the heap was being expanded.
+    set_space_boundaries(desired_eden_size, desired_survivor_size, SpaceDecorator::Clear, SpaceDecorator::DontMangle);
+    MemRegion cmr((HeapWord*)_virtual_space.low(),
+                  (HeapWord*)_virtual_space.high());
+
+    SerialHeap* gch = SerialHeap::heap();
+    gch->rem_set()->resize_covered_region(cmr);
+
+    log_debug(gc, ergo, heap)(
+        SERIAL_GC_AHS_PREFIX "New generation size " SIZE_FORMAT "K->" SIZE_FORMAT "K [eden=" SIZE_FORMAT "K,survivor=" SIZE_FORMAT "K]",
+        new_size_before/K, _virtual_space.committed_size()/K,
+        eden()->capacity()/K, from()->capacity()/K);
+  }
+
+  return changed;
 }
 
 void DefNewGeneration::compute_new_size() {
@@ -781,6 +878,7 @@ oop DefNewGeneration::copy_to_survivor_space(oop old) {
     // processing expects to refer to a from-space object.
     _string_dedup_requests.add(old);
   }
+
   return obj;
 }
 

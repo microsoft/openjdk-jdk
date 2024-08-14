@@ -245,15 +245,20 @@ void GenArguments::initialize_size_info() {
     }
   }
 
-  log_trace(gc, heap)("1: Minimum young " SIZE_FORMAT "  Initial young " SIZE_FORMAT "  Maximum young " SIZE_FORMAT,
+  log_info(gc, heap)("1: Minimum young " SIZE_FORMAT "  Initial young " SIZE_FORMAT "  Maximum young " SIZE_FORMAT,
                       MinNewSize, initial_young_size, max_young_size);
 
-  // At this point the minimum, initial and maximum sizes
-  // of the overall heap and of the young generation have been determined.
-  // The maximum old size can be determined from the maximum young
-  // and maximum heap size since no explicit flags exist
-  // for setting the old generation maximum.
-  MaxOldSize = MAX2(MaxHeapSize - max_young_size, GenAlignment);
+  if (UseSerialGCOverheadErgonomics) {
+    MaxOldSize = MaxHeapSize;
+  } else {
+    // At this point the minimum, initial and maximum sizes
+    // of the overall heap and of the young generation have been determined.
+    // The maximum old size can be determined from the maximum young
+    // and maximum heap size since no explicit flags exist
+    // for setting the old generation maximum.
+    MaxOldSize = MAX2(MaxHeapSize - max_young_size, GenAlignment);
+  }
+
   MinOldSize = MIN3(MaxOldSize,
                     InitialHeapSize - initial_young_size,
                     MinHeapSize - MinNewSize);
@@ -287,7 +292,7 @@ void GenArguments::initialize_size_info() {
       initial_young_size = desired_young_size;
     }
 
-    log_trace(gc, heap)("2: Minimum young " SIZE_FORMAT "  Initial young " SIZE_FORMAT "  Maximum young " SIZE_FORMAT,
+    log_info(gc, heap)("2: Minimum young " SIZE_FORMAT "  Initial young " SIZE_FORMAT "  Maximum young " SIZE_FORMAT,
                         MinNewSize, initial_young_size, max_young_size);
   }
 
@@ -304,7 +309,7 @@ void GenArguments::initialize_size_info() {
     OldSize = initial_old_size;
   }
 
-  log_trace(gc, heap)("Minimum old " SIZE_FORMAT "  Initial old " SIZE_FORMAT "  Maximum old " SIZE_FORMAT,
+  log_info(gc, heap)("Minimum old " SIZE_FORMAT "  Initial old " SIZE_FORMAT "  Maximum old " SIZE_FORMAT,
                       MinOldSize, OldSize, MaxOldSize);
 
   DEBUG_ONLY(assert_size_info();)
@@ -341,9 +346,14 @@ void GenArguments::assert_size_info() {
   assert(OldSize <= MaxOldSize, "Ergonomics decided on incompatible initial and maximum old gen sizes");
   assert(MaxOldSize % GenAlignment == 0, "MaxOldSize alignment");
   assert(OldSize % GenAlignment == 0, "OldSize alignment");
-  assert(MaxHeapSize <= (MaxNewSize + MaxOldSize), "Total maximum heap sizes must be sum of generation maximum sizes");
+
+  if (!UseSerialGCOverheadErgonomics) {
+    assert(MaxHeapSize <= (MaxNewSize + MaxOldSize), "Total maximum heap sizes must be sum of generation maximum sizes");
+  }
   assert(MinNewSize + MinOldSize <= MinHeapSize, "Minimum generation sizes exceed minimum heap size");
   assert(NewSize + OldSize == InitialHeapSize, "Initial generation sizes should match initial heap size");
-  assert(MaxNewSize + MaxOldSize == MaxHeapSize, "Maximum generation sizes should match maximum heap size");
+  if (!UseSerialGCOverheadErgonomics) {
+    assert(MaxNewSize + MaxOldSize == MaxHeapSize, "Maximum generation sizes should match maximum heap size");
+  }
 }
 #endif // ASSERT

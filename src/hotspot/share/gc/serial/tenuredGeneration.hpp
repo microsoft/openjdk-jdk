@@ -85,6 +85,8 @@ class TenuredGeneration: public Generation {
   void compute_new_size_inner();
 
 public:
+  void adjust_size(size_t desired_new_size);
+  size_t committed_size() const;
   void compute_new_size();
 
   ContiguousSpace* space() const { return _the_space; }
