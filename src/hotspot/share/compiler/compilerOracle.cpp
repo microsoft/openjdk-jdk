@@ -923,6 +923,39 @@ public:
     }
 };
 
+static void read_comp_level(enum OptionType type, char* line, int& total_bytes_read,
+        TypedMethodOptionMatcher* matcher, CompileCommandEnum option, char* errorbuf, const int buf_size) {
+
+  int bytes_read = 0;
+  const char* ccname = option2name(option);
+  const char* type_str = optiontype2name(type);
+  int skipped = skip_whitespace(line);
+  total_bytes_read += skipped;
+
+  uintx comp_level;
+  bool success = false;
+  success = sscanf(line, "" UINTX_FORMAT "%n", &comp_level, &bytes_read) == 1;
+
+  if (success) {
+    total_bytes_read += bytes_read;
+    line += bytes_read;
+    matcher->set_comp_level(comp_level);
+  } else {
+    jio_snprintf(errorbuf, buf_size, "Compilation level cannot be read for option '%s' of type '%s'", ccname, type_str);
+  }
+}
+
+static void parse_comp_level_if_present(enum OptionType type, char* line, int& total_bytes_read,
+                                TypedMethodOptionMatcher* matcher, CompileCommandEnum option,
+                                LineCopy& original, char* errorbuf) {
+  int skipped = skip_whitespace(line);
+  total_bytes_read += skipped;
+  if (*line != '\0') {
+    skip_comma(line);
+    read_comp_level(type, line, total_bytes_read, matcher, option, errorbuf, sizeof(errorbuf));
+  }
+}
+
 bool CompilerOracle::parse_from_line_quietly(char* line) {
   const bool quiet0 = _quiet;
   _quiet = true;
@@ -965,8 +998,8 @@ bool CompilerOracle::parse_from_line(char* line) {
     // Two types of trailing options are
     // supported:
     //
-    // (1) CompileCommand=option,Klass::method,option
-    // (2) CompileCommand=option,Klass::method,type,option,value
+    // (1) CompileCommand=option,Klass::method,option[,<comp_level>]
+    // (2) CompileCommand=option,Klass::method,type,option,value[,<comp_level>]
     //
     // Type (1) is used to enable a boolean option for a method.
     //
@@ -1022,8 +1055,8 @@ bool CompilerOracle::parse_from_line(char* line) {
     delete archetype;
   } else {  // not an OptionCommand
     // Command has the following form:
-    // CompileCommand=<option>,<method pattern><value>
-    // CompileCommand=<option>,<method pattern>     (implies option is bool and value is true)
+    // CompileCommand=<option>,<method pattern><value>[,<comp_level>]
+    // CompileCommand=<option>,<method pattern>[,<comp_level>]          (implies option is bool and value is true)
     assert(*error_buf == '\0', "Don't call here with error_buf already set");
     enum OptionType type = option2type(option);
     int bytes_read = 0;
@@ -1038,10 +1071,20 @@ bool CompilerOracle::parse_from_line(char* line) {
       if (option2type(option) == OptionType::Bool) {
         // if this is a bool option this implies true
         register_command(matcher, option, true);
+        parse_comp_level_if_present(type, line, bytes_read, matcher, option, original, error_buf);
+        if (*error_buf != '\0') {
+          print_parse_error(error_buf, original.get());
+          return false;
+        }
         return true;
       } else if (option == CompileCommandEnum::MemStat) {
         // MemStat default action is to collect data but to not print
         register_command(matcher, option, (uintx)MemStatAction::collect);
+        parse_comp_level_if_present(type, line, bytes_read, matcher, option, original, error_buf);
+        if (*error_buf != '\0') {
+          print_parse_error(error_buf, original.get());
+          return false;
+        }
         return true;
       } else {
         jio_snprintf(error_buf, sizeof(error_buf), "  Option '%s' is not followed by a value", option2name(option));
@@ -1050,6 +1093,12 @@ bool CompilerOracle::parse_from_line(char* line) {
       }
     }
     scan_value(type, line, bytes_read, matcher, option, error_buf, sizeof(error_buf));
+    if (*error_buf != '\0') {
+      print_parse_error(error_buf, original.get());
+      return false;
+    }
+    line += bytes_read;
+    parse_comp_level_if_present(type, line, bytes_read, matcher, option, original, error_buf);
     if (*error_buf != '\0') {
       print_parse_error(error_buf, original.get());
       return false;

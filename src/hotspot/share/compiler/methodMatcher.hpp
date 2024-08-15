@@ -46,7 +46,7 @@ class MethodMatcher : public CHeapObj<mtCompiler> {
   Symbol*        _signature;
   Mode           _class_mode;
   Mode           _method_mode;
-  int            _comp_level; /* Each bit i (0 <= i <= 4) represents a CompLevel. */
+  int            _comp_level;
 
  public:
   Symbol* class_name() const { return _class_name; }
@@ -54,6 +54,8 @@ class MethodMatcher : public CHeapObj<mtCompiler> {
   Symbol* method_name() const { return _method_name; }
   Mode method_mode() const { return _method_mode; }
   Symbol* signature() const { return _signature; }
+
+  void set_comp_level(int comp_level) { _comp_level = comp_level; }
 
   MethodMatcher();
   ~MethodMatcher();

@@ -77,7 +77,7 @@ MethodMatcher::MethodMatcher():
   , _signature(nullptr)
   , _class_mode(Exact)
   , _method_mode(Exact)
-  , _comp_level(-1) {
+  , _comp_level(CompLevel::CompLevel_all) {
 }
 
 MethodMatcher::~MethodMatcher() {
@@ -220,12 +220,12 @@ bool MethodMatcher::match(Symbol* candidate, Symbol* match, Mode match_mode) con
 }
 
 bool MethodMatcher::match(int comp_level_param) const {
-  // If Match is valid for all levels, then return true
+  // If the matcher is valid for all levels, then return true
   if (_comp_level == CompLevel::CompLevel_all) {
     return true;
   }
 
-  // If we are checking if Match is allowed at any level and
+  // If we are checking if the matcher is allowed at any level and
   // Match is configured for some level, then return true
   if (comp_level_param == CompLevel::CompLevel_any && _comp_level != 0) {
     return true;
