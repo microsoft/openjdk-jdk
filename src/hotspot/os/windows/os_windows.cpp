@@ -3336,8 +3336,6 @@ size_t os::win32::large_page_init_decide_size() {
         WARN("JVM cannot use large pages bigger than 4mb.");
         return 0;
       }
-    } else {
-      WARN("EnableAllLargePageSizesForWindows flag is ignored on Windows versions prior to Windows 11/Windows Server 2022 due to limited support.");
     }
 #endif
   if (LargePageSizeInBytes > 0) {
