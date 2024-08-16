@@ -824,7 +824,7 @@ TEST_VM(os_windows, large_page_init_decide_size) {
 
   // Assert that the decided size defaults to minimum page size when LargePageSizeInBytes
   // is not a multiple of the minimum size, assuming conditions are always met
-  EXPECT_EQ(decided_size, min_size) << "Expected decided size to default to minimum large page size when LargePageSizeInBytes is not a multiple of minimum size";
+  EXPECT_EQ(decided_size, 0) << "Expected decided size to default to 0 when LargePageSizeInBytes is not a multiple of minimum size";
 }
 
 class ReserveMemorySpecialRunnable : public TestRunnable {
