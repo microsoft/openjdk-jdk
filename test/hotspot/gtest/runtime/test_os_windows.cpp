@@ -791,7 +791,10 @@ TEST_VM(os_windows, large_page_init_decide_size) {
   // Test for large page support
   size_t decided_size = os::win32::large_page_init_decide_size();
   size_t min_size = GetLargePageMinimum();
-  EXPECT_EQ(decided_size, 0) << "Expected decided size to be 0 when large page is not supported by the processor";
+  if (min_size == 0) {
+    EXPECT_EQ(decided_size, 0) << "Expected decided size to be 0 when large page is not supported by the processor";
+    return;
+  }
 
   // Scenario 1: Test with 2MB large page size
   if (min_size == 2 * M) {
