@@ -716,6 +716,35 @@ static bool parseMemStat(const char* line, uintx& value, int& bytes_read, char* 
   return false;
 }
 
+static void read_comp_level(enum OptionType type, char* line, int& total_bytes_read,
+        TypedMethodOptionMatcher* matcher, CompileCommandEnum option) {
+  int bytes_read = 0;
+  const char* ccname = option2name(option);
+  const char* type_str = optiontype2name(type);
+  int skipped = skip_whitespace(line);
+  total_bytes_read += skipped;
+
+  uintx comp_level;
+  bool success = false;
+  success = sscanf(line, "" UINTX_FORMAT "%n", &comp_level, &bytes_read) == 1;
+
+  if (success) {
+    total_bytes_read += bytes_read;
+    line += bytes_read;
+    matcher->set_comp_level(comp_level);
+  }
+}
+
+static void parse_comp_level_if_present(enum OptionType type, char* line, int& total_bytes_read,
+                                TypedMethodOptionMatcher* matcher, CompileCommandEnum option) {
+  int skipped = skip_whitespace(line);
+  total_bytes_read += skipped;
+  if (*line != '\0') {
+    skip_comma(line);
+    read_comp_level(type, line, total_bytes_read, matcher, option);
+  }
+}
+
 static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
         TypedMethodOptionMatcher* matcher, CompileCommandEnum option, char* errorbuf, const int buf_size) {
   int bytes_read = 0;
@@ -736,6 +765,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
     if (success) {
       total_bytes_read += bytes_read;
       line += bytes_read;
+      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
       register_command(matcher, option, value);
       return;
     } else {
@@ -754,6 +784,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
     if (success) {
       total_bytes_read += bytes_read;
       line += bytes_read;
+      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
       register_command(matcher, option, value);
     } else {
       jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
@@ -764,6 +795,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
     if (sscanf(line, "%255[_a-zA-Z0-9]%n", value, &bytes_read) == 1) {
       total_bytes_read += bytes_read;
       line += bytes_read;
+      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
       register_command(matcher, option, (ccstr) value);
       return;
     } else {
@@ -816,6 +848,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
       }
 
       register_command(matcher, option, (ccstr) value);
+      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
       return;
     } else {
       jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
@@ -833,17 +866,25 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
         total_bytes_read += bytes_read;
         line += bytes_read;
         register_command(matcher, option, true);
+        parse_comp_level_if_present(type, line, bytes_read, matcher, option);
         return;
       } else if (strcasecmp(value, "false") == 0) {
         total_bytes_read += bytes_read;
         line += bytes_read;
         register_command(matcher, option, false);
+        parse_comp_level_if_present(type, line, bytes_read, matcher, option);
         return;
       } else {
         jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
+        return;
       }
-    } else {
-      jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
+    }
+    parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+    line += bytes_read;
+    if (*line == '\0') {
+      // Short version of a CompileCommand sets a boolean Option to true
+      // -XXCompileCommand=<Option>,<method pattern>,<comp_level>
+      register_command(matcher, option, true);
     }
   } else if (type == OptionType::Double) {
     char buffer[2][256];
@@ -855,6 +896,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
       total_bytes_read += bytes_read;
       line += bytes_read;
       register_command(matcher, option, atof(value));
+      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
       return;
     } else {
       jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
@@ -923,38 +965,6 @@ public:
     }
 };
 
-static void read_comp_level(enum OptionType type, char* line, int& total_bytes_read,
-        TypedMethodOptionMatcher* matcher, CompileCommandEnum option, char* errorbuf, const int buf_size) {
-
-  int bytes_read = 0;
-  const char* ccname = option2name(option);
-  const char* type_str = optiontype2name(type);
-  int skipped = skip_whitespace(line);
-  total_bytes_read += skipped;
-
-  uintx comp_level;
-  bool success = false;
-  success = sscanf(line, "" UINTX_FORMAT "%n", &comp_level, &bytes_read) == 1;
-
-  if (success) {
-    total_bytes_read += bytes_read;
-    line += bytes_read;
-    matcher->set_comp_level(comp_level);
-  } else {
-    jio_snprintf(errorbuf, buf_size, "Compilation level cannot be read for option '%s' of type '%s'", ccname, type_str);
-  }
-}
-
-static void parse_comp_level_if_present(enum OptionType type, char* line, int& total_bytes_read,
-                                TypedMethodOptionMatcher* matcher, CompileCommandEnum option,
-                                LineCopy& original, char* errorbuf) {
-  int skipped = skip_whitespace(line);
-  total_bytes_read += skipped;
-  if (*line != '\0') {
-    skip_comma(line);
-    read_comp_level(type, line, total_bytes_read, matcher, option, errorbuf, sizeof(errorbuf));
-  }
-}
 
 bool CompilerOracle::parse_from_line_quietly(char* line) {
   const bool quiet0 = _quiet;
@@ -1071,7 +1081,6 @@ bool CompilerOracle::parse_from_line(char* line) {
       if (option2type(option) == OptionType::Bool) {
         // if this is a bool option this implies true
         register_command(matcher, option, true);
-        parse_comp_level_if_present(type, line, bytes_read, matcher, option, original, error_buf);
         if (*error_buf != '\0') {
           print_parse_error(error_buf, original.get());
           return false;
@@ -1080,7 +1089,6 @@ bool CompilerOracle::parse_from_line(char* line) {
       } else if (option == CompileCommandEnum::MemStat) {
         // MemStat default action is to collect data but to not print
         register_command(matcher, option, (uintx)MemStatAction::collect);
-        parse_comp_level_if_present(type, line, bytes_read, matcher, option, original, error_buf);
         if (*error_buf != '\0') {
           print_parse_error(error_buf, original.get());
           return false;
@@ -1093,12 +1101,6 @@ bool CompilerOracle::parse_from_line(char* line) {
       }
     }
     scan_value(type, line, bytes_read, matcher, option, error_buf, sizeof(error_buf));
-    if (*error_buf != '\0') {
-      print_parse_error(error_buf, original.get());
-      return false;
-    }
-    line += bytes_read;
-    parse_comp_level_if_present(type, line, bytes_read, matcher, option, original, error_buf);
     if (*error_buf != '\0') {
       print_parse_error(error_buf, original.get());
       return false;
