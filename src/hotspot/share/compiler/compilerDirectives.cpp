@@ -26,6 +26,7 @@
 #include "ci/ciMethod.hpp"
 #include "ci/ciUtilities.inline.hpp"
 #include "compiler/abstractCompiler.hpp"
+#include "compiler/compileBroker.hpp"
 #include "compiler/compilerDefinitions.inline.hpp"
 #include "compiler/compilerDirectives.hpp"
 #include "compiler/compilerOracle.hpp"
@@ -184,11 +185,14 @@ int CompilerDirectives::refcount() {
 
 DirectiveSet* CompilerDirectives::get_for(int comp_level) {
   assert(DirectivesStack_lock->owned_by_self(), "");
-  if (comp_level >= CompLevel::CompLevel_full_optimization) {
-    JVMCI_ONLY(return _c1_store;)
-    NOT_JVMCI(return _c2_store;)
+  AbstractCompiler *comp = CompileBroker::compiler(comp_level);
+  if (comp == nullptr) { // Xint
+    return _c1_store;
+  } else  if (comp->is_c2()) {
+    return _c2_store;
   } else {
     // use c1_store as default
+    assert(comp->is_c1() || comp->is_jvmci(), "");
     return _c1_store;
   }
 }
