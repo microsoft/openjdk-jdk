@@ -186,7 +186,7 @@ public class CheckCompileCommandOption {
         {
             "-XX:CompileCommand=InvalidOption,Test::test,_foo,_bar",
             "-XX:CompileCommand=TestOptionInt,Test::test,_foo",
-            "-XX:CompileCommand=TestOptionBool,Test::test,1",
+            "-XX:CompileCommand=TestOptionBool,Test::test,foo",
             "-XX:CompileCommand=TestOptionDouble,Test::test,-1",
             "-XX:CompileCommand=TestOptionUint,Test::test",
             "-XX:CompileCommand=TestOptionBool2,Test::test,falsee",

@@ -42,7 +42,7 @@ MethodCounters::MethodCounters(const methodHandle& mh) :
 
   // Set per-method thresholds.
   double scale = 1.0;
-  CompilerOracle::has_option_value(mh, CompileCommandEnum::CompileThresholdScaling, scale);
+  CompilerOracle::has_option_value(mh, CompileCommandEnum::CompileThresholdScaling, CompLevel::CompLevel_any, scale);
 
   _invoke_mask = right_n_bits(CompilerConfig::scaled_freq_log(Tier0InvokeNotifyFreqLog, scale)) << InvocationCounter::count_shift;
   _backedge_mask = right_n_bits(CompilerConfig::scaled_freq_log(Tier0BackedgeNotifyFreqLog, scale)) << InvocationCounter::count_shift;

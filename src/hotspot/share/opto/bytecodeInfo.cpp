@@ -116,7 +116,7 @@ static bool is_unboxing_method(ciMethod* callee_method, Compile* C) {
 bool InlineTree::should_inline(ciMethod* callee_method, ciMethod* caller_method,
                                int caller_bci, bool& should_delay, ciCallProfile& profile) {
   // Allows targeted inlining
-  if (C->directive()->should_inline(callee_method)) {
+  if (C->directive()->should_inline(callee_method, C->env()->comp_level())) {
     set_msg("force inline by CompileCommand");
     _forced_inline = true;
     return true;
@@ -231,12 +231,12 @@ bool InlineTree::should_not_inline(ciMethod* callee_method, ciMethod* caller_met
   }
 
   // ignore heuristic controls on inlining
-  if (C->directive()->should_inline(callee_method)) {
+  if (C->directive()->should_inline(callee_method, C->env()->comp_level())) {
     set_msg("force inline by CompileCommand");
     return false;
   }
 
-  if (C->directive()->should_not_inline(callee_method)) {
+  if (C->directive()->should_not_inline(callee_method, C->env()->comp_level())) {
     set_msg("disallowed by CompileCommand");
     return true;
   }
