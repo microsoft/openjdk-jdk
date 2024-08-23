@@ -890,7 +890,9 @@ WB_ENTRY(jboolean, WB_IsMethodCompilable(JNIEnv* env, jobject o, jobject method,
       return can_be_compiled_at_level(mh, is_osr, CompLevel_full_optimization);
     } else if (excluded_c2) {
       // C2 only has ExcludeOption set: Check if compilable with C1.
-      return can_be_compiled_at_level(mh, is_osr, CompLevel_simple);
+      return can_be_compiled_at_level(mh, is_osr, CompLevel_simple) ||
+             can_be_compiled_at_level(mh, is_osr, CompLevel_limited_profile) ||
+             can_be_compiled_at_level(mh, is_osr, CompLevel_full_profile);
     }
   } else if (comp_level > CompLevel_none && is_excluded_for_compiler(comp_level, mh)) {
     // Compilation of 'method' excluded by compiler used for 'comp_level'.
@@ -1158,7 +1160,6 @@ WB_ENTRY(jint, WB_MatchesInline(JNIEnv* env, jobject o, jobject method, jstring 
   }
 
   // Pattern works - now check if it matches
-  // TODO: Maybe add a "comp_level" parameter?
   int result;
   if (m->match(mh, CompLevel::CompLevel_any, InlineMatcher::force_inline)) {
     result = 2; // Force inline match
@@ -1190,7 +1191,6 @@ WB_ENTRY(jint, WB_MatchesMethod(JNIEnv* env, jobject o, jobject method, jstring 
   }
 
   // Pattern works - now check if it matches
-  // TODO: Maybe add a "comp_level" parameter
   int result = m->matches(mh, CompLevel::CompLevel_any);
   delete m;
   assert(result == 0 || result == 1, "Result out of range");
@@ -1994,7 +1994,6 @@ static bool GetMethodOption(JavaThread* thread, JNIEnv* env, jobject method, jst
   if (!CompilerOracle::option_matches_type(option, *value)) {
     return false;
   }
-  // TODO: Maybe add a "comp_level" parameter
   return CompilerOracle::has_option_value(mh, option, CompLevel::CompLevel_any, *value);
 }
 

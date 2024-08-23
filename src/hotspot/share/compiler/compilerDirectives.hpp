@@ -80,16 +80,16 @@
     cflags(BlockLayoutByFrequency,                  bool,        BlockLayoutByFrequency,         BlockLayoutByFrequency,     CompLevel::CompLevel_all)  \
     cflags(PrintOptoAssembly,                       bool,             PrintOptoAssembly,              PrintOptoAssembly,     CompLevel::CompLevel_all)  \
     cflags(PrintIntrinsics,                         bool,               PrintIntrinsics,                PrintIntrinsics,     CompLevel::CompLevel_all)  \
+    cflags(TraceSpilling,                           bool,                 TraceSpilling,                  TraceSpilling,     CompLevel::CompLevel_all)  \
+    cflags(Vectorize,                               bool,                         false,                      Vectorize,     CompLevel::CompLevel_all)  \
+    cflags(CloneMapDebug,                           bool,                         false,                  CloneMapDebug,     CompLevel::CompLevel_all)  \
+    cflags(IncrementalInlineForceCleanup,           bool, IncrementalInlineForceCleanup,  IncrementalInlineForceCleanup,     CompLevel::CompLevel_all)  \
+    cflags(MaxNodeLimit,                            intx,                  MaxNodeLimit,                   MaxNodeLimit,     CompLevel::CompLevel_all)  \
 NOT_PRODUCT(cflags(TraceOptoPipelining,             bool,           TraceOptoPipelining,            TraceOptoPipelining,     CompLevel::CompLevel_all)) \
 NOT_PRODUCT(cflags(TraceOptoOutput,                 bool,               TraceOptoOutput,                TraceOptoOutput,     CompLevel::CompLevel_all)) \
 NOT_PRODUCT(cflags(TraceEscapeAnalysis,             bool,                         false,            TraceEscapeAnalysis,     CompLevel::CompLevel_all)) \
 NOT_PRODUCT(cflags(PrintIdeal,                      bool,                    PrintIdeal,                     PrintIdeal,     CompLevel::CompLevel_all)) \
-    cflags(TraceSpilling,                           bool,                 TraceSpilling,                  TraceSpilling,     CompLevel::CompLevel_all)  \
-    cflags(Vectorize,                               bool,                         false,                      Vectorize,     CompLevel::CompLevel_all)  \
-    cflags(CloneMapDebug,                           bool,                         false,                  CloneMapDebug,     CompLevel::CompLevel_all)  \
-NOT_PRODUCT(cflags(IGVPrintLevel,                   intx,          PrintIdealGraphLevel,                  IGVPrintLevel,     CompLevel::CompLevel_all)) \
-    cflags(IncrementalInlineForceCleanup,           bool, IncrementalInlineForceCleanup,  IncrementalInlineForceCleanup,     CompLevel::CompLevel_all)  \
-    cflags(MaxNodeLimit,                            intx,                  MaxNodeLimit,                   MaxNodeLimit,     CompLevel::CompLevel_all)
+NOT_PRODUCT(cflags(IGVPrintLevel,                   intx,          PrintIdealGraphLevel,                  IGVPrintLevel,     CompLevel::CompLevel_all))
 
 #define compilerdirectives_c2_string_flags(cflags)                                                                                                      \
 NOT_PRODUCT(cflags(TraceAutoVectorization,     ccstrlist,                            "",         TraceAutoVectorization,     CompLevel::CompLevel_all)) \

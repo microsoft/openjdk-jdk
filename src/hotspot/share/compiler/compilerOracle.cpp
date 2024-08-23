@@ -371,8 +371,8 @@ static bool resolve_inlining_predicate(CompileCommandEnum option, const methodHa
   bool v1 = false;
   bool v2 = false;
   bool has_inline = CompilerOracle::has_option_value(method, CompileCommandEnum::Inline, comp_level, v1);
-  bool has_dnotinline = CompilerOracle::has_option_value(method, CompileCommandEnum::DontInline, comp_level, v2);
-  if (has_inline && has_dnotinline) {
+  bool has_dontinline = CompilerOracle::has_option_value(method, CompileCommandEnum::DontInline, comp_level, v2);
+  if (has_inline && has_dontinline) {
     if (v1 && v2) {
       // Conflict options detected
       // Find the last one for that method and return the predicate accordingly
@@ -398,7 +398,7 @@ static bool resolve_inlining_predicate(CompileCommandEnum option, const methodHa
     if (option == CompileCommandEnum::Inline) {
       return has_inline ? v1 : false;
     } else {
-      return has_dnotinline ? v2 : false;
+      return has_dontinline ? v2 : false;
     }
   }
 }
@@ -567,8 +567,8 @@ enum OptionType CompilerOracle::parse_option_type(const char* type_str) {
 
 static void print_tip() { // CMH Update info
   tty->cr();
-  tty->print_cr("Usage: '-XX:CompileCommand=<option>,<method pattern>' - to set boolean option to true");
-  tty->print_cr("Usage: '-XX:CompileCommand=<option>,<method pattern>,<value>'");
+  tty->print_cr("Usage: '-XX:CompileCommand=<option>,<method pattern>[,<comp_level>]' - to set boolean option to true");
+  tty->print_cr("Usage: '-XX:CompileCommand=<option>,<method pattern>,<value>[,<comp_level>]'");
   tty->print_cr("Use:   '-XX:CompileCommand=help' for more information and to list all option.");
   tty->cr();
 }
@@ -594,8 +594,9 @@ static void usage() {
   tty->print_cr("behavior of the dynamic compilers.");
   tty->cr();
   tty->print_cr("Compile commands has this general form:");
-  tty->print_cr("-XX:CompileCommand=<option><method pattern><value>");
+  tty->print_cr("-XX:CompileCommand=<option><method pattern><value><comp_level>");
   tty->print_cr("    Sets <option> to the specified value for methods matching <method pattern>");
+  tty->print_cr("    when compiling at the <comp_level> compilation level.");
   tty->print_cr("    All options are typed");
   tty->cr();
   tty->print_cr("-XX:CompileCommand=<option><method pattern>");
@@ -632,6 +633,8 @@ static void usage() {
   tty->print_cr("Add one command on each line.");
   tty->print_cr("  exclude java/*.*");
   tty->print_cr("  option java/*.* ReplayInline");
+  tty->cr();
+  tty->print_cr("Unless otherwise specified a command is applicable to all compilation levels.");
   tty->cr();
   tty->print_cr("The following commands have conflicting behavior: 'exclude', 'inline', 'dontinline',");
   tty->print_cr("and 'compileonly'. There is no priority of commands. Applying (a subset of) these");
@@ -716,11 +719,8 @@ static bool parseMemStat(const char* line, uintx& value, int& bytes_read, char* 
   return false;
 }
 
-static void read_comp_level(enum OptionType type, char* line, int& total_bytes_read,
-        TypedMethodOptionMatcher* matcher, CompileCommandEnum option) {
+static void read_comp_level(char* line, int& total_bytes_read, TypedMethodOptionMatcher* matcher) {
   int bytes_read = 0;
-  const char* ccname = option2name(option);
-  const char* type_str = optiontype2name(type);
   int skipped = skip_whitespace(line);
   total_bytes_read += skipped;
 
@@ -735,13 +735,12 @@ static void read_comp_level(enum OptionType type, char* line, int& total_bytes_r
   }
 }
 
-static void parse_comp_level_if_present(enum OptionType type, char* line, int& total_bytes_read,
-                                TypedMethodOptionMatcher* matcher, CompileCommandEnum option) {
+static void parse_comp_level_if_present(char* line, int& total_bytes_read, TypedMethodOptionMatcher* matcher) {
   int skipped = skip_whitespace(line);
   total_bytes_read += skipped;
   if (*line != '\0') {
     skip_comma(line);
-    read_comp_level(type, line, total_bytes_read, matcher, option);
+    read_comp_level(line, total_bytes_read, matcher);
   }
 }
 
@@ -765,7 +764,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
     if (success) {
       total_bytes_read += bytes_read;
       line += bytes_read;
-      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+      parse_comp_level_if_present(line, bytes_read, matcher);
       register_command(matcher, option, value);
       return;
     } else {
@@ -784,7 +783,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
     if (success) {
       total_bytes_read += bytes_read;
       line += bytes_read;
-      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+      parse_comp_level_if_present(line, bytes_read, matcher);
       register_command(matcher, option, value);
     } else {
       jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
@@ -795,7 +794,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
     if (sscanf(line, "%255[_a-zA-Z0-9]%n", value, &bytes_read) == 1) {
       total_bytes_read += bytes_read;
       line += bytes_read;
-      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+      parse_comp_level_if_present(line, bytes_read, matcher);
       register_command(matcher, option, (ccstr) value);
       return;
     } else {
@@ -848,7 +847,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
       }
 
       register_command(matcher, option, (ccstr) value);
-      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+      parse_comp_level_if_present(line, bytes_read, matcher);
       return;
     } else {
       jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
@@ -866,20 +865,20 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
         total_bytes_read += bytes_read;
         line += bytes_read;
         register_command(matcher, option, true);
-        parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+        parse_comp_level_if_present(line, bytes_read, matcher);
         return;
       } else if (strcasecmp(value, "false") == 0) {
         total_bytes_read += bytes_read;
         line += bytes_read;
         register_command(matcher, option, false);
-        parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+        parse_comp_level_if_present(line, bytes_read, matcher);
         return;
       } else {
         jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
         return;
       }
     }
-    parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+    parse_comp_level_if_present(line, bytes_read, matcher);
     line += bytes_read;
     if (*line == '\0') {
       // Short version of a CompileCommand sets a boolean Option to true
@@ -896,7 +895,7 @@ static void scan_value(enum OptionType type, char* line, int& total_bytes_read,
       total_bytes_read += bytes_read;
       line += bytes_read;
       register_command(matcher, option, atof(value));
-      parse_comp_level_if_present(type, line, bytes_read, matcher, option);
+      parse_comp_level_if_present(line, bytes_read, matcher);
       return;
     } else {
       jio_snprintf(errorbuf, buf_size, "Value cannot be read for option '%s' of type '%s'", ccname, type_str);
@@ -964,7 +963,6 @@ public:
       return (char*)_copy;
     }
 };
-
 
 bool CompilerOracle::parse_from_line_quietly(char* line) {
   const bool quiet0 = _quiet;

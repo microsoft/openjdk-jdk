@@ -65,6 +65,7 @@ class MethodMatcher : public CHeapObj<mtCompiler> {
   static void print_symbol(outputStream* st, Symbol* h, Mode mode);
   bool matches(const methodHandle& method, int comp_level) const;
   void print_base(outputStream* st);
+  void print_comp_levels(outputStream* st);
 
  private:
   static bool canonicalize(char * line, const char *& error_msg);
