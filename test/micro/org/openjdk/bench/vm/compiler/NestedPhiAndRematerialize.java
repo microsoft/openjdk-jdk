@@ -64,10 +64,10 @@ public abstract class NestedPhiAndRematerialize {
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     int testRematerialize_SingleObj(boolean cond1, int x, int y) throws Exception {
-        Point p = new Point(x, y);
+        Load p = new Load(x, y);
 
         if (cond1) {
-            p = new Point(x+1, y+1);
+            p = new Load(x+1, y+1);
             global_escape = p;
         }
 
@@ -81,7 +81,9 @@ public abstract class NestedPhiAndRematerialize {
     public void testRematerialize_SingleObj_runner(Blackhole bh) {
         int result = 0;
         for (int i = 0 ; i < SIZE; i++) {
-            result += testRematerialize_SingleObj(cond1[i], xs[i], ys[i]);
+            try {
+                result += testRematerialize_SingleObj(cond1[i], xs[i], ys[i]);
+            } catch (Exception e) {}
         }
         bh.consume(result);
     }
@@ -90,13 +92,15 @@ public abstract class NestedPhiAndRematerialize {
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     int testRematerialize_TryCatch(boolean cond1, int n, int x, int y) {
-        Point p = new Point(x, y);
+        Load p = new Load(x, y);
+        int a = 5;
+        int b = 10-5;
         if (cond1) {
-            p = new Point(x+1, y+1);
+            p = new Load(x+1, y+1);
             global_escape = p;
         }
         try {
-            p.y = n/0;
+            p.y = n/(a-b);
         } catch (Exception e) {}
 
         return p.y;
@@ -145,16 +149,16 @@ public abstract class NestedPhiAndRematerialize {
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     int testRematerialize_MultiObj(boolean cond1, boolean cond2, int x, int y) {
-        Point p1 = new Point(x, y);
-        Point p2 = new Point(x+2, y+4);
+        Load p1 = new Load(x, y);
+        Load p2 = new Load(x+2, y+4);
 
         if (cond1) {
-            p1 = new Point(x+1, y+1);
+            p1 = new Load(x+1, y+1);
             global_escape = p1;
         }
 
         if (x%2 == 1) {
-            p2 = new Point(x*2, y/4);
+            p2 = new Load(x*2, y/4);
         }
 
         try {
@@ -179,67 +183,13 @@ public abstract class NestedPhiAndRematerialize {
     //--------------------------------------------------------------------------------------------------------------------------------------------
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
-    public int testGlobalEscapeInThread(boolean cond, int n, int x, int y) {
-        Point p = new Point(x, y);
-        Object syncObject = new Object();
-        Runnable threadLoop = () -> {
-            if (cond)
-                global_escape = new Point( x+n, y+n);
-        };
-        Thread thLoop = new Thread(threadLoop);
-        thLoop.start();
-        try {
-            thLoop.join();
-        } catch (InterruptedException e) {}
-
-        if (cond && n % 2 == 1)
-            p.x = global_escape.x;
-
-        return p.y;
-    }
-
-    @Benchmark
-    public void testGlobalEscapeInThread_runner(Blackhole bh) {
-        int result = 0;
-        for (int i = 0 ; i < SIZE; i++) {
-            result += testGlobalEscapeInThread(cond1[i], xs[i], ys[i], zs[i]);
-        }
-        bh.consume(result);
-    }
-
-    //--------------------------------------------------------------------------------------------------------------------------------------------
-
-    @CompilerControl(CompilerControl.Mode.DONT_INLINE)
-    public int testGlobalEscapeInThreadWithSync(boolean cond, int x, int y) {
-        Point p = new Point(x, y);
-        for (int i = 0; i < 2; i++) {
-            if (cond)
-                p = new Point(x+i, y+i);
-            TestThread th = new TestThread(p);
-            th.start();
-        }
-        return p.y;
-    }
-
-    @Benchmark
-    public void testGlobalEscapeInThreadWithSync_runner(Blackhole bh) {
-        int result = 0;
-        for (int i = 0 ; i < SIZE; i++) {
-            result += testGlobalEscapeInThreadWithSync(cond1[i], xs[i], ys[i]);
-        }
-        bh.consume(result);
-    }
-
-    //--------------------------------------------------------------------------------------------------------------------------------------------
-
-    @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     public int testFieldEscapeWithMerge(boolean cond, int x, int y) {
 
-        Point p1 = new Point(x, y);
-        Point p2 = new Point(x+y, x*y);
+        Load p1 = new Load(x, y);
+        Load p2 = new Load(x+y, x*y);
         Line ln = new Line(p1, p2);
         if (cond) {
-            ln.p1 = new Point(x-y, x/y);
+            ln.p1 = new Load(x-y, x/y);
             global_escape = ln.p2;
         }
         return ln.p1.y;
@@ -497,31 +447,48 @@ public abstract class NestedPhiAndRematerialize {
 
    // ------------------ Utility for Testing ------------------- //
 
-    @DontCompile
+
+    @Fork(value = 3, jvmArgsPrepend = {
+        "-XX:+UnlockDiagnosticVMOptions",
+        "-XX:+UseTLAB",
+        "-XX:-ReduceAllocationMerges",
+    })
+    public static class NopRAM extends NestedPhiAndRematerialize {
+    }
+
+    @Fork(value = 3, jvmArgsPrepend = {
+        "-XX:+UnlockDiagnosticVMOptions",
+        "-XX:+ReduceAllocationMerges",
+    })
+    public static class YesRAM extends NestedPhiAndRematerialize {
+    }
+
+
+    @CompilerControl(CompilerControl.Mode.EXCLUDE)
     static void dummy() {
     }
 
-    @DontCompile
+    @CompilerControl(CompilerControl.Mode.EXCLUDE)
     static int dummy(Point p) {
         return p.x * p.y;
     }
 
-    @DontCompile
+    @CompilerControl(CompilerControl.Mode.EXCLUDE)
     static int dummy(int x) {
         return x;
     }
 
-    @DontCompile
+    @CompilerControl(CompilerControl.Mode.EXCLUDE)
     static Point dummy(int x, int y) {
         return new Point(x, y);
     }
 
-    @DontCompile
+    @CompilerControl(CompilerControl.Mode.EXCLUDE)
     static String dummy(String str) {
         return str;
     }
 
-    @DontCompile
+    @CompilerControl(CompilerControl.Mode.EXCLUDE)
     static ADefaults dummy_defaults() {
         return new ADefaults();
     }
@@ -551,14 +518,19 @@ public abstract class NestedPhiAndRematerialize {
             return (p.x == x) && (p.y == y);
         }
 
+        @Override
+        public int hashCode() {
+            return x + y;
+        }
+
         int getX() {
             return x;
         }
     }
 
    class Line {
-       Point p1, p2;
-       Line(Point p1, Point p2) {
+       Load p1, p2;
+       Line(Load p1, Load p2) {
            this.p1 = p1;
            this.p2 = p2;
        }
@@ -604,10 +576,36 @@ public abstract class NestedPhiAndRematerialize {
     static class ADefaults {
         static int ble;
         int i;
-        @DontCompile
+        @CompilerControl(CompilerControl.Mode.EXCLUDE)
         ADefaults(int i) { this.i = i; }
-        @DontCompile
+        @CompilerControl(CompilerControl.Mode.EXCLUDE)
         ADefaults() { }
+    }
+
+     static class Load {
+        long id;
+        String name;
+        Integer[] values = new Integer[10];
+        int x, y;
+
+        @CompilerControl(CompilerControl.Mode.INLINE)
+        Load(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == this) return true;
+            if (!(o instanceof Load)) return false;
+            Load p = (Load) o;
+            return (p.x == x) && (p.y == y);
+        }
+
+        @Override
+        public int hashCode() {
+            return x + y;
+        }
     }
 
     static class Picture {
@@ -680,24 +678,6 @@ public abstract class NestedPhiAndRematerialize {
         public Etc(String s) {
             super((int)s.length(), 0, 0, 0, 0);
             this.a = s;
-        }
-    }
-
-    class TestThread extends Thread {
-        private static Object syncObject = new Object();
-        Point p;
-
-        TestThread(Point p) {
-            this.p = p;
-        }
-
-        public void run() {
-            try {
-                synchronized(syncObject) {
-                    p = new Point(1,1);
-                    global_escape = p;
-                }
-            } catch(Exception e){}
         }
     }
 
