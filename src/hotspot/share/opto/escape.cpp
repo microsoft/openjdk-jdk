@@ -466,9 +466,9 @@ bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
   int nof_input_phi_nodes = 0;
   for (uint i = 1; i < ophi->req(); i++) {
     if (ophi->in(i)->is_Phi()) {
-      // ignore phi node with more than one input phi nodes
+      // ignore phi node with more than one input phi node
       if (++nof_input_phi_nodes > 1) {
-        NOT_PRODUCT(if (TraceReduceAllocationMerges && !found_sr_allocate) tty->print_cr("Cannot reduce Phi %d. More than one input phi node.", ophi->_idx);)
+        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d. More than one input phi node.", ophi->_idx);)
         return false;
       }
     }
@@ -538,7 +538,7 @@ bool ConnectionGraph::has_been_reduced(PhiNode* n, SafePointNode* sfpt) const {
 bool ConnectionGraph::can_reduce_check_users(Node* n, uint phi_nest_level) const {
   for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
     Node* use = n->fast_out(i);
-    // Skip Phi -> Phi -> SafePoints and allow only Phi -> SafePoints, Phi -> CastPP -> SafePoints, 
+    // Skip Phi -> Phi -> SafePoints and allow only Phi -> SafePoints and Phi -> CastPP -> SafePoints
     if (use->is_SafePoint() && (!n->is_Phi() || phi_nest_level < 1)) {
       if (use->is_Call() && use->as_Call()->has_non_debug_use(n)) {
         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Cannot reduce Phi %d on invocation %d. Call has non_debug_use().", n->_idx, _invocation);)
@@ -572,8 +572,6 @@ bool ConnectionGraph::can_reduce_check_users(Node* n, uint phi_nest_level) const
       } else if (!can_reduce_phi_check_inputs(use->as_Phi()) || !can_reduce_check_users(use->as_Phi(), phi_nest_level+1)) {
         return false;
       }
-      //test
-      tty->print_cr("Can reduce parent Phi %d child phi %d .", n->_idx, use->_idx);
     } else if (use->is_CastPP()) {
       const Type* cast_t = _igvn->type(use);
       if (cast_t == nullptr || cast_t->make_ptr()->isa_instptr() == nullptr) {
@@ -1289,7 +1287,6 @@ bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, No
 }
 
 void ConnectionGraph::reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist, Unique_Node_List &reducible_merges) {
-
   Unique_Node_List nested_phis;
   // Collect nested phi nodes first because the graph will change while splitting the child/nested phi node.
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
@@ -1298,12 +1295,6 @@ void ConnectionGraph::reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_wo
       assert(use->_idx != ophi->_idx, "Unexpected selfloop Phi.");
       nested_phis.push(use);
     }
-  }
-  
-  if (nested_phis.size() > 1) {
-    tty->print_cr("parent Phi nodes %d", nested_phis.size());
-    ophi->dump(3);
-    ophi->dump(-3);
   }
 
   // Splitting through the child phi nodes ahead of parent phi nodes in nested scenarios is crucial.
@@ -4472,7 +4463,7 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
 #ifdef ASSERT
         ptnode_adr(get_addp_base(n)->_idx)->dump();
         ptnode_adr(n->_idx)->dump();
-        assert(addp_base->is_Phi() || (jobj != nullptr && jobj != phantom_obj), "escaped allocation");
+        assert(jobj != nullptr && jobj != phantom_obj, "escaped allocation");
 #endif
         _compile->record_failure(_invocation > 0 ? C2Compiler::retry_no_iterative_escape_analysis() : C2Compiler::retry_no_escape_analysis());
         return;

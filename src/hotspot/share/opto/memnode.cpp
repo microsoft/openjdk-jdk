@@ -1552,7 +1552,7 @@ Node* LoadNode::get_region_of_split_through_base_phi(Node *base) {
   bool base_is_phi = (base != nullptr) && base->is_Phi();
   Node* region = nullptr;  
   if (!base_is_phi) {
-    assert(mem->is_Phi(), "sanity");
+    assert(mem->is_Phi(), "memory node should be a Phi");
     region = mem->in(0);
     // Skip if the region dominates some control edge of the address.
     // 'region' dominates 'address' if its control edge and control edges
@@ -1560,13 +1560,13 @@ Node* LoadNode::get_region_of_split_through_base_phi(Node *base) {
     if (!MemNode::all_controls_dominate(address, region))
       return nullptr;
   } else if (!mem->is_Phi()) {
-    assert(base_is_phi, "sanity");
+    assert(base_is_phi, "base node should be a Phi");
     region = base->in(0);
     // Skip if the region dominates some control edge of the memory.
     if (!MemNode::all_controls_dominate(mem, region))
       return nullptr;
   } else if (base->in(0) != mem->in(0)) {
-    assert(base_is_phi && mem->is_Phi(), "sanity");
+    assert(base_is_phi && mem->is_Phi(), "base and memory nodes should be Phi");
     if (MemNode::all_controls_dominate(mem, base->in(0))) {
       region = base->in(0);
     } else if (MemNode::all_controls_dominate(address, mem->in(0))) {
@@ -1575,7 +1575,7 @@ Node* LoadNode::get_region_of_split_through_base_phi(Node *base) {
       return nullptr; // complex graph
     }
   } else {
-    assert(base->in(0) == mem->in(0), "sanity");
+    assert(base->in(0) == mem->in(0), "base and memory nodes should have the same region");
     region = mem->in(0);
   }
   return region;
@@ -1604,7 +1604,7 @@ static bool can_split_through_phi_helper(Node *base, Node *mem) {
 // Phi *base*. This method is essentially a copy of the validations performed
 // by 'split_through_phi'. The first use of this method was in EA code as part
 // of simplification of allocation merges.
-// Some differences from original method (split_through_phi):
+// The difference from the original method (split_through_phi) is:
 //  - If base->is_CastPP(): base = base->in(1)
 bool LoadNode::can_split_through_phi_base(PhaseGVN* phase, bool nested) {
   Node* mem        = in(Memory);
@@ -1643,7 +1643,6 @@ Node* LoadNode::get_memory_node_for_nestedphi_after_split(PhaseGVN* phase, Node 
   Node* mem        = in(Memory);
   Node* region = get_region_of_split_through_base_phi(base);
   if (region == nullptr) {
-    tty->print_cr("region null");
     return nullptr;
   }
   

@@ -34,7 +34,7 @@ import java.util.random.RandomGeneratorFactory;
 @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 @Fork(value = 3)
-public abstract class NestedPhiAndRematerialize {
+public abstract class AllocationMergesNestedPhi {
     private static final int SIZE        = 1000000;
     private static final boolean cond1[] = new boolean[SIZE];
     private static final boolean cond2[] = new boolean[SIZE];
@@ -453,14 +453,14 @@ public abstract class NestedPhiAndRematerialize {
         "-XX:+UseTLAB",
         "-XX:-ReduceAllocationMerges",
     })
-    public static class NopRAM extends NestedPhiAndRematerialize {
+    public static class NopRAM extends AllocationMergesNestedPhi {
     }
 
     @Fork(value = 3, jvmArgsPrepend = {
         "-XX:+UnlockDiagnosticVMOptions",
         "-XX:+ReduceAllocationMerges",
     })
-    public static class YesRAM extends NestedPhiAndRematerialize {
+    public static class YesRAM extends AllocationMergesNestedPhi {
     }
 
 

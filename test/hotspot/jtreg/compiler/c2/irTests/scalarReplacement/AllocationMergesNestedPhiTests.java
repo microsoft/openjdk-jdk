@@ -32,9 +32,9 @@ import compiler.lib.ir_framework.*;
  * @summary Tests that C2 can correctly scalar replace some object allocation merges.
  * @library /test/lib /
  * @requires vm.debug == true & vm.flagless & vm.bits == 64 & vm.compiler2.enabled & vm.opt.final.EliminateAllocations
- * @run driver compiler.c2.irTests.scalarReplacement.NestedPhiAndRematerializeTests
+ * @run driver compiler.c2.irTests.scalarReplacement.AllocationMergesNestedPhiTests
  */
-public class NestedPhiAndRematerializeTests {
+public class AllocationMergesNestedPhiTests {
     private int invocations = 0;
     private static Point global_escape = new Point(2022, 2023);
 

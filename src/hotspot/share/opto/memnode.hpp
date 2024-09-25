@@ -248,9 +248,9 @@ public:
   virtual Node *Ideal(PhaseGVN *phase, bool can_reshape);
 
   // Return true if it's possible to split the Load through a Phi merging the bases
-   bool can_split_through_phi_base(PhaseGVN *phase, bool nested = false);
+  bool can_split_through_phi_base(PhaseGVN *phase, bool nested = false);
 
-  // Returns a memory node for load node after spliting through nestedphi node
+  // Returns a memory node for load node after splitting through nestedphi node
   // Calling code is responsible to clean up (remove_dead_node) after use
   Node* get_memory_node_for_nestedphi_after_split(PhaseGVN* phase, Node *base, uint parent_idx);
   Node* get_region_of_split_through_base_phi(Node *base);
