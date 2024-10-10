@@ -201,6 +201,10 @@ class VMManagementImpl implements VMManagement {
     private native long getUptime0();
     public native int getAvailableProcessors();
 
+    public String getErgonomicsProfile() {
+        return System.getProperty("java.vm.ergonomics.profile");
+    }
+
     // Compilation Subsystem
     public String   getCompilerName() {
         @SuppressWarnings("removal")

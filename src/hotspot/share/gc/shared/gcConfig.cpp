@@ -95,7 +95,7 @@ void GCConfig::fail_if_non_included_gc_is_selected() {
   NOT_ZGC(         FAIL_IF_SELECTED(UseZGC));
 }
 
-void GCConfig::select_gc_ergonomically() {
+void select_gc_ergonomically_shared() {
   if (os::is_server_class_machine()) {
 #if INCLUDE_G1GC
     FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
@@ -108,6 +108,40 @@ void GCConfig::select_gc_ergonomically() {
 #if INCLUDE_SERIALGC
     FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
 #endif
+  }
+}
+
+// Selects the garbage collector (GC) ergonomically based on the system's characteristics.
+// It first checks the physical memory available on the system and the number of active processors.
+// Depending on these factors, it sets the appropriate GC flag to true using the FLAG_SET_ERGO_IF_DEFAULT macro.
+// If the system has only one active processor, it selects the Serial GC, no matter how much memory is available.
+// If the physical memory is greater than 2GB, it selects the G1GC.
+// Otherwise, it selects the Parallel GC.
+void select_gc_ergonomically_dedicated() {
+  julong phys_mem = os::physical_memory();
+  if (os::active_processor_count() <= 1) {
+#if INCLUDE_SERIALGC
+      FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
+#endif
+    } else if (phys_mem > 2048*M) {
+#if INCLUDE_G1GC
+      FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
+#endif
+    } else { 
+#if INCLUDE_PARALLELGC
+      FLAG_SET_ERGO_IF_DEFAULT(UseParallelGC, true);
+#endif
+    }
+}
+
+void GCConfig::select_gc_ergonomically() {
+  if (strcmp(ErgonomicsProfile, "shared") == 0) {
+    select_gc_ergonomically_shared();
+  } else if (strcmp(ErgonomicsProfile, "dedicated") == 0) {
+    select_gc_ergonomically_dedicated();
+  } else {
+    // We have got to have at least one GC selected. Otherwise, we will crash.
+    ShouldNotReachHere();
   }
 }
 
