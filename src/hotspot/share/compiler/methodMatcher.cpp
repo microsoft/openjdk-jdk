@@ -76,7 +76,8 @@ MethodMatcher::MethodMatcher():
   , _method_name(nullptr)
   , _signature(nullptr)
   , _class_mode(Exact)
-  , _method_mode(Exact) {
+  , _method_mode(Exact)
+  , _comp_level(CompLevel::CompLevel_all) {
 }
 
 MethodMatcher::~MethodMatcher() {
@@ -93,12 +94,13 @@ MethodMatcher::~MethodMatcher() {
 
 void MethodMatcher::init(Symbol* class_name, Mode class_mode,
                              Symbol* method_name, Mode method_mode,
-                             Symbol* signature) {
+                             Symbol* signature, int comp_level) {
  _class_mode = class_mode;
  _method_mode = method_mode;
  _class_name = class_name;
  _method_name = method_name;
  _signature = signature;
+ _comp_level = comp_level;
 }
 
 bool MethodMatcher::canonicalize(char * line, const char *& error_msg) {
@@ -215,6 +217,21 @@ bool MethodMatcher::match(Symbol* candidate, Symbol* match, Mode match_mode) con
   default:
     return false;
   }
+}
+
+bool MethodMatcher::match(int comp_level_param) const {
+  // If the matcher is valid for all levels, then return true
+  if (_comp_level == CompLevel::CompLevel_all) {
+    return true;
+  }
+
+  // If we are checking if the matcher is allowed at any level and
+  // Match is configured for some level, then return true
+  if (comp_level_param == CompLevel::CompLevel_any && _comp_level != 0) {
+    return true;
+  }
+
+  return comp_level_param == _comp_level;
 }
 
 static MethodMatcher::Mode check_mode(char name[], const char*& error_msg) {
@@ -339,19 +356,20 @@ void MethodMatcher::parse_method_pattern(char*& line, const char*& error_msg, Me
     Symbol* c_name = SymbolTable::new_symbol(class_name);
     Symbol* m_name = SymbolTable::new_symbol(method_name);
 
-    matcher->init(c_name, c_match, m_name, m_match, signature);
+    matcher->init(c_name, c_match, m_name, m_match, signature, CompLevel::CompLevel_any);
     return;
   } else {
     error_msg = "Could not parse method pattern";
   }
 }
 
-bool MethodMatcher::matches(const methodHandle& method) const {
+bool MethodMatcher::matches(const methodHandle& method, int comp_level) const {
   Symbol* class_name  = method->method_holder()->name();
   Symbol* method_name = method->name();
   Symbol* signature = method->signature();
 
-  if (match(class_name, this->class_name(), _class_mode) &&
+  if (match(comp_level) &&
+      match(class_name, this->class_name(), _class_mode) &&
       match(method_name, this->method_name(), _method_mode) &&
       ((this->signature() == nullptr) || match(signature, this->signature(), Prefix))) {
     return true;
@@ -380,6 +398,13 @@ void MethodMatcher::print_base(outputStream* st) {
   if (signature() != nullptr) {
     signature()->print_utf8_on(st);
   }
+  print_comp_levels(st);
+}
+
+void MethodMatcher::print_comp_levels(outputStream* st) {
+  if (_comp_level != CompLevel::CompLevel_all) {
+    st->print(" for comp. level %d ", _comp_level);
+  }
 }
 
 BasicMatcher* BasicMatcher::parse_method_pattern(char* line, const char*& error_msg, bool expect_trailing_chars) {
@@ -403,9 +428,9 @@ BasicMatcher* BasicMatcher::parse_method_pattern(char* line, const char*& error_
   return bm;
 }
 
-bool BasicMatcher::match(const methodHandle& method) {
+bool BasicMatcher::match(const methodHandle& method, int comp_level) {
   for (BasicMatcher* current = this; current != nullptr; current = current->next()) {
-    if (current->matches(method)) {
+    if (current->matches(method, comp_level)) {
       return true;
     }
   }
@@ -432,9 +457,9 @@ InlineMatcher* InlineMatcher::parse_method_pattern(char* line, const char*& erro
   return im;
 }
 
-bool InlineMatcher::match(const methodHandle& method, int inline_action) {
+bool InlineMatcher::match(const methodHandle& method, int comp_level, int inline_action) {
   for (InlineMatcher* current = this; current != nullptr; current = current->next()) {
-    if (current->matches(method)) {
+    if (current->matches(method, comp_level)) {
       return (current->_inline_action == inline_action);
     }
   }

@@ -201,7 +201,7 @@ address OptoRuntime::generate_stub(ciEnv* env,
                                    bool return_pc) {
 
   // Matching the default directive, we currently have no method to match.
-  DirectiveSet* directive = DirectivesStack::getDefaultDirective(CompileBroker::compiler(CompLevel_full_optimization));
+  DirectiveSet* directive = DirectivesStack::getDefaultDirective(CompLevel::CompLevel_full_optimization);
   ResourceMark rm;
   Compile C(env, gen, C_function, name, is_fancy_jump, pass_tls, return_pc, directive);
   DirectivesStack::release(directive);

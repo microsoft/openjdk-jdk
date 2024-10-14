@@ -303,8 +303,8 @@ class ciMethod : public ciMetadata {
   // Find the proper vtable index to invoke this method.
   int resolve_vtable_index(ciKlass* caller, ciKlass* receiver);
 
-  bool has_option(CompileCommandEnum option);
-  bool has_option_value(CompileCommandEnum option, double& value);
+  bool has_option(CompileCommandEnum option, int comp_level);
+  bool has_option_value(CompileCommandEnum option, int comp_level, double& value);
   bool can_be_compiled();
   bool can_be_parsed() const { return _can_be_parsed; }
   bool has_compiled_code();

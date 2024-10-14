@@ -156,7 +156,7 @@ const DirectivesParser::key DirectivesParser::keys[] = {
     { "inline", type_inline, 1, mask(type_directives) | mask(type_c1) | mask(type_c2), nullptr, UnknownFlagType },
 
     // Global flags
-    #define common_flag_key(name, type, dvalue, compiler) \
+    #define common_flag_key(name, type, dvalue, compiler, clevel) \
     { #name, type_flag, 0, mask(type_directives) | mask(type_c1) | mask(type_c2), &DirectiveSet::set_##name, type##Flag},
     compilerdirectives_common_flags(common_flag_key)
     compilerdirectives_c2_flags(common_flag_key)

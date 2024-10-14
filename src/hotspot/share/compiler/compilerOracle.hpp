@@ -44,61 +44,61 @@ class methodHandle;
   type(Ccstrlist, "ccstrlist") \
   type(Double, "double")
 
-//       COMPILECOMMAND_OPTIONS: option, name, variant, type
-#define COMPILECOMMAND_OPTIONS(option) \
-  option(Help,  "help",  Unknown) \
-  option(Quiet, "quiet", Unknown) \
-  option(Log, "log", Bool) \
-  option(Print, "print", Bool) \
-  option(Inline,  "inline", Bool) \
-  option(DontInline,  "dontinline", Bool) \
-  option(Blackhole,  "blackhole", Bool) \
-  option(CompileOnly, "compileonly", Bool)\
-  option(Exclude, "exclude", Bool) \
-  option(Break, "break", Bool) \
-  option(BreakAtExecute, "BreakAtExecute", Bool) \
-  option(BreakAtCompile, "BreakAtCompile", Bool) \
-  option(MemLimit, "MemLimit", Intx) \
-  option(MemStat, "MemStat", Uintx) \
-  option(PrintAssembly, "PrintAssembly", Bool) \
-  option(PrintCompilation, "PrintCompilation", Bool) \
-  option(PrintInlining, "PrintInlining", Bool) \
-  option(PrintIntrinsics, "PrintIntrinsics", Bool) \
-  option(PrintNMethods, "PrintNMethods", Bool)   \
-  option(PrintOptoAssembly, "PrintOptoAssembly", Bool) \
-  option(PrintDebugInfo,    "PrintDebugInfo",    Bool) \
-  option(PrintRelocations,  "PrintRelocations",  Bool) \
-  option(PrintDependencies, "PrintDependencies", Bool) \
-  option(BackgroundCompilation, "BackgroundCompilation", Bool) \
-  option(RepeatCompilation, "RepeatCompilation", Intx) \
-  option(ReplayInline,   "ReplayInline", Bool) \
-  option(DumpReplay,     "DumpReplay", Bool) \
-  option(DumpInline,     "DumpInline", Bool) \
-  option(CompileThresholdScaling, "CompileThresholdScaling", Double) \
-  option(ControlIntrinsic,  "ControlIntrinsic",  Ccstrlist) \
-  option(DisableIntrinsic,  "DisableIntrinsic",  Ccstrlist) \
-  option(BlockLayoutByFrequency, "BlockLayoutByFrequency", Bool) \
-  option(TraceOptoPipelining, "TraceOptoPipelining", Bool) \
-  option(TraceOptoOutput, "TraceOptoOutput", Bool) \
-  option(TraceSpilling, "TraceSpilling", Bool) \
-NOT_PRODUCT(option(TraceEscapeAnalysis, "TraceEscapeAnalysis", Bool)) \
-NOT_PRODUCT(option(PrintIdeal, "PrintIdeal", Bool))  \
-NOT_PRODUCT(option(PrintIdealPhase, "PrintIdealPhase", Ccstrlist)) \
-NOT_PRODUCT(option(IGVPrintLevel, "IGVPrintLevel", Intx)) \
-NOT_PRODUCT(option(TraceAutoVectorization, "TraceAutoVectorization", Ccstrlist)) \
-  option(Vectorize, "Vectorize", Bool) \
-  option(CloneMapDebug, "CloneMapDebug", Bool) \
-  option(IncrementalInlineForceCleanup, "IncrementalInlineForceCleanup", Bool) \
-  option(MaxNodeLimit, "MaxNodeLimit", Intx)  \
-NOT_PRODUCT(option(TestOptionInt,    "TestOptionInt",    Intx)) \
-NOT_PRODUCT(option(TestOptionUint,   "TestOptionUint",   Uintx)) \
-NOT_PRODUCT(option(TestOptionBool,   "TestOptionBool",   Bool)) \
-NOT_PRODUCT(option(TestOptionBool2,  "TestOptionBool2",  Bool)) \
-NOT_PRODUCT(option(TestOptionStr,    "TestOptionStr",    Ccstr)) \
-NOT_PRODUCT(option(TestOptionList,   "TestOptionList",   Ccstrlist)) \
-NOT_PRODUCT(option(TestOptionDouble, "TestOptionDouble", Double)) \
-  option(Option, "option", Unknown) \
-  option(Unknown, "unknown", Unknown)
+//       COMPILECOMMAND_OPTIONS: option, name, type
+#define COMPILECOMMAND_OPTIONS(option)                                                          \
+            option(Help,                          "help",                          Unknown)     \
+            option(Quiet,                         "quiet",                         Unknown)     \
+            option(Log,                           "log",                           Bool)        \
+            option(Print,                         "print",                         Bool)        \
+            option(Inline,                        "inline",                        Bool)        \
+            option(DontInline,                    "dontinline",                    Bool)        \
+            option(Blackhole,                     "blackhole",                     Bool)        \
+            option(CompileOnly,                   "compileonly",                   Bool)        \
+            option(Exclude,                       "exclude",                       Bool)        \
+            option(Break,                         "break",                         Bool)        \
+            option(BreakAtExecute,                "BreakAtExecute",                Bool)        \
+            option(BreakAtCompile,                "BreakAtCompile",                Bool)        \
+            option(MemLimit,                      "MemLimit",                      Intx)        \
+            option(MemStat,                       "MemStat",                       Uintx)       \
+            option(PrintAssembly,                 "PrintAssembly",                 Bool)        \
+            option(PrintCompilation,              "PrintCompilation",              Bool)        \
+            option(PrintInlining,                 "PrintInlining",                 Bool)        \
+            option(PrintIntrinsics,               "PrintIntrinsics",               Bool)        \
+            option(PrintNMethods,                 "PrintNMethods",                 Bool)        \
+            option(PrintOptoAssembly,             "PrintOptoAssembly",             Bool)        \
+            option(PrintDebugInfo,                "PrintDebugInfo",                Bool)        \
+            option(PrintRelocations,              "PrintRelocations",              Bool)        \
+            option(PrintDependencies,             "PrintDependencies",             Bool)        \
+            option(BackgroundCompilation,         "BackgroundCompilation",         Bool)        \
+            option(RepeatCompilation,             "RepeatCompilation",             Intx)        \
+            option(ReplayInline,                  "ReplayInline",                  Bool)        \
+            option(DumpReplay,                    "DumpReplay",                    Bool)        \
+            option(DumpInline,                    "DumpInline",                    Bool)        \
+            option(CompileThresholdScaling,       "CompileThresholdScaling",       Double)      \
+            option(ControlIntrinsic,              "ControlIntrinsic",              Ccstrlist)   \
+            option(DisableIntrinsic,              "DisableIntrinsic",              Ccstrlist)   \
+            option(BlockLayoutByFrequency,        "BlockLayoutByFrequency",        Bool)        \
+            option(TraceOptoPipelining,           "TraceOptoPipelining",           Bool)        \
+            option(TraceOptoOutput,               "TraceOptoOutput",               Bool)        \
+            option(TraceSpilling,                 "TraceSpilling",                 Bool)        \
+            option(Vectorize,                     "Vectorize",                     Bool)        \
+            option(CloneMapDebug,                 "CloneMapDebug",                 Bool)        \
+            option(IncrementalInlineForceCleanup, "IncrementalInlineForceCleanup", Bool)        \
+            option(MaxNodeLimit,                  "MaxNodeLimit",                  Intx)        \
+NOT_PRODUCT(option(TraceEscapeAnalysis,           "TraceEscapeAnalysis",           Bool))       \
+NOT_PRODUCT(option(PrintIdeal,                    "PrintIdeal",                    Bool))       \
+NOT_PRODUCT(option(PrintIdealPhase,               "PrintIdealPhase",               Ccstrlist))  \
+NOT_PRODUCT(option(IGVPrintLevel,                 "IGVPrintLevel",                 Intx))       \
+NOT_PRODUCT(option(TraceAutoVectorization,        "TraceAutoVectorization",        Ccstrlist))  \
+NOT_PRODUCT(option(TestOptionInt,                 "TestOptionInt",                 Intx))       \
+NOT_PRODUCT(option(TestOptionUint,                "TestOptionUint",                Uintx))      \
+NOT_PRODUCT(option(TestOptionBool,                "TestOptionBool",                Bool))       \
+NOT_PRODUCT(option(TestOptionBool2,               "TestOptionBool2",               Bool))       \
+NOT_PRODUCT(option(TestOptionStr,                 "TestOptionStr",                 Ccstr))      \
+NOT_PRODUCT(option(TestOptionList,                "TestOptionList",                Ccstrlist))  \
+NOT_PRODUCT(option(TestOptionDouble,              "TestOptionDouble",              Double))     \
+            option(Option,                        "option",                        Unknown)     \
+            option(Unknown,                       "unknown",                       Unknown)
 
 enum class CompileCommandEnum : int {
   #define enum_of_options(option, name, ctype) option,
@@ -138,27 +138,27 @@ class CompilerOracle : AllStatic {
   // Reads from file and adds to lists
   static bool parse_from_file();
 
-  // Tells whether we to exclude compilation of method
-  static bool should_exclude(const methodHandle& method);
+  // Tells whether we want to exclude compilation of this method
+  static bool should_exclude(const methodHandle& method, int comp_level);
   static bool be_quiet() { return _quiet; }
 
   // Tells whether we want to inline this method
-  static bool should_inline(const methodHandle& method);
+  static bool should_inline(const methodHandle& method, int comp_level);
 
   // Tells whether we want to disallow inlining of this method
-  static bool should_not_inline(const methodHandle& method);
+  static bool should_not_inline(const methodHandle& method, int comp_level);
 
   // Tells whether this method changes Thread.currentThread()
-  static bool changes_current_thread(const methodHandle& method);
+  static bool changes_current_thread(const methodHandle& method, int comp_level);
 
   // Tells whether we should print the assembly for this method
-  static bool should_print(const methodHandle& method);
+  static bool should_print(const methodHandle& method, int comp_level);
 
   // Tells whether we should log the compilation data for this method
-  static bool should_log(const methodHandle& method);
+  static bool should_log(const methodHandle& method, int comp_level);
 
   // Tells whether to break when compiling method
-  static bool should_break_at(const methodHandle& method);
+  static bool should_break_at(const methodHandle& method, int comp_level);
 
   // Tells whether there are any methods to print for print_method_statistics()
   static bool should_print_methods();
@@ -168,15 +168,15 @@ class CompilerOracle : AllStatic {
   static bool should_print_final_memstat_report();
 
   // Tags the method as blackhole candidate, if possible.
-  static void tag_blackhole_if_possible(const methodHandle& method);
+  static void tag_blackhole_if_possible(const methodHandle& method, int comp_level);
 
   // A wrapper for checking bool options
-  static bool has_option(const methodHandle& method, CompileCommandEnum option);
+  static bool has_option(const methodHandle& method, CompileCommandEnum option, int comp_level);
 
   // Check if method has option and value set. If yes, overwrite value and return true,
   // otherwise leave value unchanged and return false.
   template<typename T>
-  static bool has_option_value(const methodHandle& method, CompileCommandEnum option, T& value);
+  static bool has_option_value(const methodHandle& method, CompileCommandEnum option, int comp_level, T& value);
 
   // This check is currently only needed by whitebox API
   template<typename T>

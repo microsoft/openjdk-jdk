@@ -26,6 +26,7 @@
 #include "ci/ciMethod.hpp"
 #include "ci/ciUtilities.inline.hpp"
 #include "compiler/abstractCompiler.hpp"
+#include "compiler/compileBroker.hpp"
 #include "compiler/compilerDefinitions.inline.hpp"
 #include "compiler/compilerDirectives.hpp"
 #include "compiler/compilerOracle.hpp"
@@ -142,14 +143,14 @@ CompilerDirectives* CompilerDirectives::next() {
   return _next;
 }
 
-bool CompilerDirectives::match(const methodHandle& method) {
+bool CompilerDirectives::match(const methodHandle& method, int comp_level) {
   if (is_default_directive()) {
     return true;
   }
   if (method == nullptr) {
     return false;
   }
-  if (_match->match(method)) {
+  if (_match->match(method, comp_level)) {
     return true;
   }
   return false;
@@ -182,8 +183,9 @@ int CompilerDirectives::refcount() {
   return _ref_count;
 }
 
-DirectiveSet* CompilerDirectives::get_for(AbstractCompiler *comp) {
+DirectiveSet* CompilerDirectives::get_for(int comp_level) {
   assert(DirectivesStack_lock->owned_by_self(), "");
+  AbstractCompiler *comp = CompileBroker::compiler(comp_level);
   if (comp == nullptr) { // Xint
     return _c1_store;
   } else  if (comp->is_c2()) {
@@ -304,7 +306,7 @@ DirectiveSet::DirectiveSet(CompilerDirectives* d) :
   _ideal_phase_name_set(PHASE_NUM_TYPES, mtCompiler),
   _trace_auto_vectorization_tags(TRACE_AUTO_VECTORIZATION_TAG_NUM, mtCompiler)
 {
-#define init_defaults_definition(name, type, dvalue, compiler) this->name##Option = dvalue;
+#define init_defaults_definition(name, type, dvalue, compiler, clevel) this->name##Option = dvalue;
   compilerdirectives_common_flags(init_defaults_definition)
   compilerdirectives_c2_flags(init_defaults_definition)
   compilerdirectives_c1_flags(init_defaults_definition)
@@ -322,7 +324,7 @@ DirectiveSet::~DirectiveSet() {
     tmp = next;
   }
 
-#define free_string_flags(name, type, dvalue, cc_flag) if (_modified[name##Index]) os::free(const_cast<char*>(name##Option));
+#define free_string_flags(name, type, dvalue, cc_flag, clevel) if (_modified[name##Index]) os::free(const_cast<char*>(name##Option));
   compilerdirectives_common_string_flags(free_string_flags)
   compilerdirectives_c2_string_flags(free_string_flags)
   compilerdirectives_c1_string_flags(free_string_flags)
@@ -377,7 +379,7 @@ class DirectiveSetPtr {
 // - if some option is changed we need to copy directiveset since it no longer can be shared
 // - Need to free copy after use
 // - Requires a modified bit so we don't overwrite options that is set by directives
-DirectiveSet* DirectiveSet::compilecommand_compatibility_init(const methodHandle& method) {
+DirectiveSet* DirectiveSet::compilecommand_compatibility_init(const methodHandle& method, int comp_level) {
   // Early bail out - checking all options is expensive - we rely on them not being used
   // Only set a flag if it has not been modified and value changes.
   // Only copy set if a flag needs to be set
@@ -396,7 +398,7 @@ DirectiveSet* DirectiveSet::compilecommand_compatibility_init(const methodHandle
 
     // All CompileCommands are not equal so this gets a bit verbose
     // When CompileCommands have been refactored less clutter will remain.
-    if (CompilerOracle::should_break_at(method)) {
+    if (CompilerOracle::should_break_at(method, comp_level)) {
       // If the directives didn't have 'BreakAtCompile' or 'BreakAtExecute',
       // the sub-command 'Break' of the 'CompileCommand' would become effective.
       if (!_modified[BreakAtCompileIndex]) {
@@ -407,26 +409,26 @@ DirectiveSet* DirectiveSet::compilecommand_compatibility_init(const methodHandle
       }
     }
     if (!_modified[LogIndex]) {
-      bool log = CompilerOracle::should_log(method);
+      bool log = CompilerOracle::should_log(method, comp_level);
       if (log != set->LogOption) {
         set.cloned()->LogOption = log;
       }
     }
 
-    if (CompilerOracle::should_print(method)) {
+    if (CompilerOracle::should_print(method, comp_level)) {
       if (!_modified[PrintAssemblyIndex]) {
         set.cloned()->PrintAssemblyOption = true;
       }
     }
     // Exclude as in should not compile == Enabled
-    if (CompilerOracle::should_exclude(method)) {
+    if (CompilerOracle::should_exclude(method, comp_level)) {
       if (!_modified[ExcludeIndex]) {
         set.cloned()->ExcludeOption = true;
       }
     }
 
     // inline and dontinline (including exclude) are implemented in the directiveset accessors
-#define init_default_cc(name, type, dvalue, cc_flag) { type v; if (!_modified[name##Index] && CompileCommandEnum::cc_flag != CompileCommandEnum::Unknown && CompilerOracle::has_option_value(method, CompileCommandEnum::cc_flag, v) && v != this->name##Option) { set.cloned()->name##Option = v; } }
+#define init_default_cc(name, type, dvalue, cc_flag, clevel) { type v; if (!_modified[name##Index] && CompileCommandEnum::cc_flag != CompileCommandEnum::Unknown && CompilerOracle::has_option_value(method, CompileCommandEnum::cc_flag, clevel, v) && v != this->name##Option) { set.cloned()->name##Option = v; } }
     compilerdirectives_common_flags(init_default_cc)
     compilerdirectives_c2_flags(init_default_cc)
     compilerdirectives_c1_flags(init_default_cc)
@@ -438,7 +440,7 @@ DirectiveSet* DirectiveSet::compilecommand_compatibility_init(const methodHandle
     if (!_modified[TraceAutoVectorizationIndex]) {
       // Parse ccstr and create mask
       ccstrlist option;
-      if (CompilerOracle::has_option_value(method, CompileCommandEnum::TraceAutoVectorization, option)) {
+      if (CompilerOracle::has_option_value(method, CompileCommandEnum::TraceAutoVectorization, comp_level, option)) {
         TraceAutoVectorizationTagValidator validator(option, false);
         if (validator.is_valid()) {
           set.cloned()->set_trace_auto_vectorization_tags(validator.tags());
@@ -448,7 +450,7 @@ DirectiveSet* DirectiveSet::compilecommand_compatibility_init(const methodHandle
     if (!_modified[PrintIdealPhaseIndex]) {
       // Parse ccstr and create set
       ccstrlist option;
-      if (CompilerOracle::has_option_value(method, CompileCommandEnum::PrintIdealPhase, option)) {
+      if (CompilerOracle::has_option_value(method, CompileCommandEnum::PrintIdealPhase, comp_level, option)) {
         PhaseNameValidator validator(option);
         if (validator.is_valid()) {
           assert(!validator.phase_name_set().is_empty(), "Phase name set must be non-empty");
@@ -464,7 +466,7 @@ DirectiveSet* DirectiveSet::compilecommand_compatibility_init(const methodHandle
     bool need_reset = true; // if Control/DisableIntrinsic redefined, only need to reset control_words once
 
     if (!_modified[ControlIntrinsicIndex] &&
-        CompilerOracle::has_option_value(method, CompileCommandEnum::ControlIntrinsic, option_value)) {
+        CompilerOracle::has_option_value(method, CompileCommandEnum::ControlIntrinsic, comp_level, option_value)) {
       ControlIntrinsicIter iter(option_value);
 
       if (need_reset) {
@@ -484,7 +486,7 @@ DirectiveSet* DirectiveSet::compilecommand_compatibility_init(const methodHandle
 
 
     if (!_modified[DisableIntrinsicIndex] &&
-        CompilerOracle::has_option_value(method, CompileCommandEnum::DisableIntrinsic, option_value)) {
+        CompilerOracle::has_option_value(method, CompileCommandEnum::DisableIntrinsic, comp_level, option_value)) {
       ControlIntrinsicIter iter(option_value, true/*disable_all*/);
 
       if (need_reset) {
@@ -513,39 +515,39 @@ CompilerDirectives* DirectiveSet::directive() {
   return _directive;
 }
 
-bool DirectiveSet::matches_inline(const methodHandle& method, int inline_action) {
+bool DirectiveSet::matches_inline(const methodHandle& method, int comp_level, int inline_action) {
   if (_inlinematchers != nullptr) {
-    if (_inlinematchers->match(method, inline_action)) {
+    if (_inlinematchers->match(method, comp_level, inline_action)) {
       return true;
     }
   }
   return false;
 }
 
-bool DirectiveSet::should_inline(ciMethod* inlinee) {
+bool DirectiveSet::should_inline(ciMethod* inlinee, int comp_level) {
   inlinee->check_is_loaded();
   VM_ENTRY_MARK;
   methodHandle mh(THREAD, inlinee->get_Method());
 
   if (_inlinematchers != nullptr) {
-    return matches_inline(mh, InlineMatcher::force_inline);
+    return matches_inline(mh, comp_level, InlineMatcher::force_inline);
   }
   if (!CompilerDirectivesIgnoreCompileCommandsOption) {
-    return CompilerOracle::should_inline(mh);
+    return CompilerOracle::should_inline(mh, comp_level);
   }
   return false;
 }
 
-bool DirectiveSet::should_not_inline(ciMethod* inlinee) {
+bool DirectiveSet::should_not_inline(ciMethod* inlinee, int comp_level) {
   inlinee->check_is_loaded();
   VM_ENTRY_MARK;
   methodHandle mh(THREAD, inlinee->get_Method());
 
   if (_inlinematchers != nullptr) {
-    return matches_inline(mh, InlineMatcher::dont_inline);
+    return matches_inline(mh, comp_level, InlineMatcher::dont_inline);
   }
   if (!CompilerDirectivesIgnoreCompileCommandsOption) {
-    return CompilerOracle::should_not_inline(mh);
+    return CompilerOracle::should_not_inline(mh, comp_level);
   }
   return false;
 }
@@ -617,13 +619,13 @@ DirectiveSet* DirectiveSet::clone(DirectiveSet const* src) {
     tmp = tmp->next();
   }
 
-  #define copy_members_definition(name, type, dvalue, cc_flag) set->name##Option = src->name##Option;
+  #define copy_members_definition(name, type, dvalue, cc_flag, clevel) set->name##Option = src->name##Option;
     compilerdirectives_common_other_flags(copy_members_definition)
     compilerdirectives_c2_other_flags(copy_members_definition)
     compilerdirectives_c1_other_flags(copy_members_definition)
   #undef copy_members_definition
 
-#define copy_string_members_definition(name, type, dvalue, cc_flag)          \
+#define copy_string_members_definition(name, type, dvalue, cc_flag, clevel)  \
   if (src->_modified[name##Index]) {                                         \
     set->name##Option = os::strdup_check_oom(src->name##Option, mtCompiler); \
   } else {                                                                   \
@@ -657,12 +659,12 @@ void DirectivesStack::init() {
   push(_default_directives);
 }
 
-DirectiveSet* DirectivesStack::getDefaultDirective(AbstractCompiler* comp) {
+DirectiveSet* DirectivesStack::getDefaultDirective(int comp_level) {
   MutexLocker locker(DirectivesStack_lock, Mutex::_no_safepoint_check_flag);
 
   assert(_bottom != nullptr, "Must never be empty");
   _bottom->inc_refcount();
-  return _bottom->get_for(comp);
+  return _bottom->get_for(comp_level);
 }
 
 void DirectivesStack::push(CompilerDirectives* directive) {
@@ -747,7 +749,7 @@ void DirectivesStack::release(CompilerDirectives* dir) {
   }
 }
 
-DirectiveSet* DirectivesStack::getMatchingDirective(const methodHandle& method, AbstractCompiler *comp) {
+DirectiveSet* DirectivesStack::getMatchingDirective(const methodHandle& method, int comp_level) {
   assert(_depth > 0, "Must never be empty");
 
   DirectiveSet* match = nullptr;
@@ -758,8 +760,8 @@ DirectiveSet* DirectivesStack::getMatchingDirective(const methodHandle& method, 
     assert(dir != nullptr, "Must be initialized");
 
     while (dir != nullptr) {
-      if (dir->is_default_directive() || dir->match(method)) {
-        match = dir->get_for(comp);
+      if (dir->is_default_directive() || dir->match(method, comp_level)) {
+        match = dir->get_for(comp_level);
         assert(match != nullptr, "Consistency");
         if (match->EnableOption || dir->is_default_directive()) {
           // The directiveSet for this compile is also enabled -> success
@@ -773,5 +775,5 @@ DirectiveSet* DirectivesStack::getMatchingDirective(const methodHandle& method, 
   guarantee(match != nullptr, "There should always be a default directive that matches");
 
   // Check for legacy compile commands update, without DirectivesStack_lock
-  return match->compilecommand_compatibility_init(method);
+  return match->compilecommand_compatibility_init(method, comp_level);
 }

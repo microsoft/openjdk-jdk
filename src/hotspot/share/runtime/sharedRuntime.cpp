@@ -2855,7 +2855,7 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
           }
         }
 
-        DirectiveSet* directive = DirectivesStack::getMatchingDirective(method, CompileBroker::compiler(CompLevel_simple));
+        DirectiveSet* directive = DirectivesStack::getMatchingDirective(method, CompLevel::CompLevel_simple);
         if (directive->PrintAssemblyOption) {
           nm->print_code();
         }
