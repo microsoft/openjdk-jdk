@@ -121,6 +121,14 @@
   product(bool, UseShenandoahGC, false,                                     \
           "Use the Shenandoah garbage collector")                           \
                                                                             \
+  /* notice: once stable enough, goal is to change default to auto */       \
+  product(bool, AutoErgonomicsProfile, false, "Use automatic selection of " \
+          "ergonomics profiles.")                                           \
+  product(ccstr, ErgonomicsProfile, "shared",                               \
+          "Ergonomics profile to use. "                                     \
+          "\"shared\" for traditional environments (default). "             \
+          "\"dedicated\" for environments with dedicated resources.")       \
+                                                                            \
   /* notice: the max range value here is INT_MAX not UINT_MAX  */           \
   /* to protect from overflows                                 */           \
   product(uint, ParallelGCThreads, 0,                                       \
