@@ -293,35 +293,11 @@ const julong double_infinity  = CONST64(0x7FF0000000000000);
 
 #if !defined(X86)
 JRT_LEAF(jfloat, SharedRuntime::frem(jfloat x, jfloat y))
-#ifdef _WIN64
-  // 64-bit Windows on amd64 returns the wrong values for
-  // infinity operands.
-  juint xbits = PrimitiveConversions::cast<juint>(x);
-  juint ybits = PrimitiveConversions::cast<juint>(y);
-  // x Mod Infinity == x unless x is infinity
-  if (((xbits & float_sign_mask) != float_infinity) &&
-       ((ybits & float_sign_mask) == float_infinity) ) {
-    return x;
-  }
-  return ((jfloat)fmod_winx64((double)x, (double)y));
-#else
   return ((jfloat)fmod((double)x,(double)y));
-#endif
 JRT_END
 
 JRT_LEAF(jdouble, SharedRuntime::drem(jdouble x, jdouble y))
-#ifdef _WIN64
-  julong xbits = PrimitiveConversions::cast<julong>(x);
-  julong ybits = PrimitiveConversions::cast<julong>(y);
-  // x Mod Infinity == x unless x is infinity
-  if (((xbits & double_sign_mask) != double_infinity) &&
-       ((ybits & double_sign_mask) == double_infinity) ) {
-    return x;
-  }
-  return ((jdouble)fmod_winx64((double)x, (double)y));
-#else
   return ((jdouble)fmod((double)x,(double)y));
-#endif
 JRT_END
 #endif // !X86
 
