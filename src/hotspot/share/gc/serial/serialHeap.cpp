@@ -204,7 +204,7 @@ jint SerialHeap::initialize() {
 
   _young_gen = new DefNewGeneration(young_rs, NewSize, MinNewSize, MaxNewSize);
   _old_gen = new TenuredGeneration(old_rs, OldSize, MinOldSize, MaxOldSize, rem_set());
-  _adaptive_heap_size_manager = new AdaptiveHeapSizeManager(_young_gen, _old_gen);
+  _adaptive_heap_size_manager = new AdaptiveHeapSizeManager(_young_gen, _old_gen, _gc_overhead_tracker);
 
   GCInitLogger::print();
 
@@ -497,13 +497,7 @@ bool SerialHeap::do_young_collection(bool clear_soft_refs) {
   }
 
   if (UseSerialGCOverheadErgonomics) {
-    /*
-    // Survivor use percentages can be computed here if necessary
-    size_t pre_gc_survivor_used_percent = 100 * pre_gc_values.from_used / pre_gc_values.from_capacity;
-    int gc_survivor_used_percent = int(100 * from()->used() / from()->capacity();
-    */
-
-    _gc_overhead_tracker->end_young_collection(result);
+    _gc_overhead_tracker->end_young_collection(result, _young_gen->from()->used());
   }
 
   _young_gen->compute_new_size();

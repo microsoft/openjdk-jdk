@@ -40,13 +40,15 @@ GCOverheadTracker::GCOverheadTracker() {
   _completed_young_collections = 0;
   _completed_full_collections = 0;
   _gc_overhead_window_pause_time = 0;
+  _survivor_used_after_last_young_collection = 0;
 }
 
 void GCOverheadTracker::start_young_collection() {
   start_collection();
 }
 
-int GCOverheadTracker::end_young_collection(bool full_collection_required) {
+int GCOverheadTracker::end_young_collection(bool full_collection_required, size_t survivor_used_after_last_young_collection) {
+  _survivor_used_after_last_young_collection = survivor_used_after_last_young_collection;
   return end_collection(false /* is_full */, full_collection_required);
 }
 

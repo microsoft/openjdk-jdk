@@ -31,19 +31,27 @@
 #include "gc/shared/space.hpp"
 #include "adaptiveHeapSizeManager.hpp"
 
-AdaptiveHeapSizeManager::AdaptiveHeapSizeManager(DefNewGeneration* young_gen, TenuredGeneration* old_gen) {
+AdaptiveHeapSizeManager::AdaptiveHeapSizeManager(DefNewGeneration* young_gen, TenuredGeneration* old_gen, GCOverheadTracker* gc_overhead_tracker) {
   _young_gen = young_gen;
   _old_gen = old_gen;
   _adaptive_heap_size_table = new AdaptiveHeapSizeTable();
+  _gc_overhead_tracker = gc_overhead_tracker;
 }
 
 SerialHeapComponentSizes AdaptiveHeapSizeManager::target_heap_component_sizes(int gc_overhead) const {
   const size_t used_after_full_gc = _old_gen->used();
   const size_t target_old_gen_size = used_after_full_gc * 2;
   const size_t max_new_size = MaxHeapSize - target_old_gen_size;
+  const size_t min_survivor_space_size = Generation::GenGrain;
 
   size_t prev_eden_capacity = _young_gen->eden()->capacity();
-  size_t max_eden_capacity = max_new_size;
+  size_t desired_survivor_size = _gc_overhead_tracker->survivor_used_after_last_young_collection() * 2;
+  if (desired_survivor_size < min_survivor_space_size) {
+    desired_survivor_size = min_survivor_space_size;
+  }
+  size_t max_eden_capacity = max_new_size - 2 * desired_survivor_size;
+
+  assert(max_eden_capacity <= max_new_size, "eden capacity must not exceed max new size");
 
   // TODO: Use ZGC resizing algorithm
   size_t desired_eden_size = _adaptive_heap_size_table->target_size_after_young_collection(SerialGCOverheadTarget, gc_overhead, prev_eden_capacity, max_eden_capacity);
@@ -63,8 +71,8 @@ SerialHeapComponentSizes AdaptiveHeapSizeManager::target_heap_component_sizes(in
        (R + 2)s - 2s = e
        s(R + 2 - 2) = e
        s = e/R
-  */
   size_t desired_survivor_size = desired_eden_size / SurvivorRatio;
+  */
 
   return SerialHeapComponentSizes(desired_eden_size, desired_survivor_size, target_old_gen_size, max_eden_capacity);
 }

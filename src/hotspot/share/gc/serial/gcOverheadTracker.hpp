@@ -48,19 +48,22 @@ private:
   LinkedListImpl<GcOverheadPauseTime> _gc_overhead_window;
   double _gc_overhead_window_pause_time;
 
+  size_t _survivor_used_after_last_young_collection;
+
   void start_collection();
   int end_collection(bool is_full, bool full_collection_required);
 
 public:
   GCOverheadTracker();
   void start_young_collection();
-  int end_young_collection(bool full_collection_required);
+  int end_young_collection(bool full_collection_required, size_t survivor_used_after_last_young_collection);
 
   void start_full_collection();
   int end_full_collection();
 
   int add_to_gc_overhead_window(double current_time, double pause_time);
   int completed_full_collections() { return _completed_full_collections; }
+  size_t survivor_used_after_last_young_collection() { return _survivor_used_after_last_young_collection; }
 };
 
 #endif // SHARE_GC_SERIAL_GCOVERHEADTRACKER_HPP

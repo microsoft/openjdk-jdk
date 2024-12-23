@@ -28,6 +28,7 @@
 #include "memory/allocation.hpp"
 #include "gc/serial/adaptiveHeapSizeTable.hpp"
 #include "gc/serial/defNewGeneration.hpp"
+#include "gc/serial/gcOverheadTracker.hpp"
 #include "gc/serial/serialHeapComponentSizes.hpp"
 #include "gc/serial/tenuredGeneration.hpp"
 
@@ -36,12 +37,13 @@ private:
   DefNewGeneration* _young_gen;
   TenuredGeneration* _old_gen;
   AdaptiveHeapSizeTable* _adaptive_heap_size_table;
+  GCOverheadTracker* _gc_overhead_tracker;
 
   SerialHeapComponentSizes target_heap_component_sizes(int gc_overhead) const;
   SerialHeapComponentSizes heap_component_sizes_for_available_memory(SerialHeapComponentSizes heap_component_sizes, size_t available_memory, int system_memory_pressure);
 
 public:
-  AdaptiveHeapSizeManager(DefNewGeneration* young_gen, TenuredGeneration* old_gen);
+  AdaptiveHeapSizeManager(DefNewGeneration* young_gen, TenuredGeneration* old_gen, GCOverheadTracker* gc_overhead_tracker);
   void resize_heap_for_target_gc_overhead(int gc_overhead);
 };
 
