@@ -208,6 +208,11 @@ void CardTable::dirty_MemRegion(MemRegion mr) {
 }
 
 void CardTable::clear_MemRegion(MemRegion mr) {
+  if (mr.word_size() == 0) {
+    // no clear operation necessary
+    return;
+  }
+
   // Be conservative: only clean cards entirely contained within the
   // region.
   CardValue* cur;
