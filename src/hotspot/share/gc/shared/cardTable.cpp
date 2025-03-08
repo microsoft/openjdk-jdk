@@ -274,3 +274,220 @@ void CardTable::print_on(outputStream* st) const {
   st->print_cr("Card table byte_map: [" PTR_FORMAT "," PTR_FORMAT "] _byte_map_base: " PTR_FORMAT,
                p2i(_byte_map), p2i(_byte_map + _byte_map_size), p2i(_byte_map_base));
 }
+
+MemRegion CardTable::committed_for_region_in_shared_virtual_space(const MemRegion mr) const {
+  HeapWord* addr_l = (HeapWord*)byte_for(mr.start());
+
+  log_debug(gc, barrier)("CardTable::committed_for_region_in_shared_virtual_space: ");
+  log_debug(gc, barrier)("    mr.start():                          " PTR_FORMAT "  mr.last():                          " PTR_FORMAT,
+                         p2i(mr.start()), p2i(mr.last()));
+  log_debug(gc, barrier)("    byte_for(mr.start()):                " PTR_FORMAT, p2i(addr_l));
+
+  if (mr.start() == _covered[0].start()) {
+    addr_l = (HeapWord*)align_down(addr_l, _page_size);
+    log_debug(gc, barrier)("    aligned byte_for(mr.start()):        " PTR_FORMAT, p2i(addr_l));
+  }
+
+  HeapWord* addr_r;
+  if (mr.is_empty()) {
+    addr_r = addr_l;
+  } else {
+    addr_r = (HeapWord*)byte_after(mr.last());
+    log_debug(gc, barrier)("    byte_after(mr.last()):               " PTR_FORMAT, p2i(addr_r));
+
+    if (mr.start() == _covered[1].start()) {
+      addr_r = (HeapWord*)align_up(addr_r, _page_size);
+      log_debug(gc, barrier)("    aligned byte_after(mr.last()):       " PTR_FORMAT, p2i(addr_r));
+    }
+  }
+
+  return MemRegion(addr_l, addr_r);
+}
+
+void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_region0, MemRegion new_region1) {
+#ifdef ASSERT
+  log_trace(gc, barrier)("CardTable::resize_covered_region_shared_virtual_space: ");
+  log_trace(gc, barrier)("   _whole_heap.start(): " PTR_FORMAT " _whole_heap.end(): " PTR_FORMAT,
+                         p2i(_whole_heap.start()), p2i(_whole_heap.end()));
+  log_trace(gc, barrier)("   new_region0.start(): " PTR_FORMAT " new_region0.end(): " PTR_FORMAT,
+                         p2i(new_region0.start()), p2i(new_region0.end()));
+  log_trace(gc, barrier)("   new_region1.start(): " PTR_FORMAT " new_region1.end(): " PTR_FORMAT,
+                         p2i(new_region1.start()), p2i(new_region1.end()));
+#endif
+
+  assert(UseSerialGC, "only the serial collector uses this method");
+  assert(SharedSerialGCVirtualSpace, "the SharedSerialGCVirtualSpace flag must be enabled");
+  assert(_whole_heap.contains(new_region0),
+         "attempt to cover area not in reserved area (region 0)");
+  assert(_whole_heap.contains(new_region1),
+         "attempt to cover area not in reserved area (region 1)");
+  assert(_covered[0].start() != nullptr, "_covered[0].start() must not be null");
+  assert(_covered[1].start() == _covered[0].end(), "_covered[1] must start at the end of _covered[0]");
+
+  const int old_gen_idx = 0, young_gen_idx = 1;
+
+  // We don't allow changes to the start of region0, only the end.
+  assert(_covered[old_gen_idx].start() == new_region0.start(), "start of region0 must not change");
+
+  assert(new_region1.start() == new_region0.end(), "start of region1 must start at the end of region0");
+
+#ifdef ASSERT
+  log_trace(gc, barrier)("CardTable resizing covered region in shared virtual space: ");
+  for (int idx=0; idx < 2; idx++) {
+    log_trace(gc, barrier)("   Before _covered[%d].start(): " PTR_FORMAT
+                           " _covered[%d].end(): " PTR_FORMAT,
+                           idx, p2i(_covered[idx].start()),
+                           idx, p2i(_covered[idx].end()));
+
+    log_trace(gc, barrier)("   After  _covered[%d].start(): " PTR_FORMAT
+                           " _covered[%d].end(): " PTR_FORMAT,
+                           idx, p2i(idx == 0 ? new_region0.start() : new_region1.start()),
+                           idx, p2i(idx == 0 ? new_region0.end() : new_region1.end()));
+  }
+#endif
+
+  MemRegion prev_combined_region = _covered[0]._union(_covered[1]);
+  MemRegion prev_committed = committed_for_region_in_shared_virtual_space(prev_combined_region);
+
+  MemRegion combined_region = new_region0._union(new_region1);
+  MemRegion new_committed = committed_for_region_in_shared_virtual_space(combined_region);
+  assert(new_committed.start() == prev_committed.start(), "start of committed card table memory must not change");
+
+#ifdef ASSERT
+  log_trace(gc, barrier)("CardTable computed combined region: ");
+  log_trace(gc, barrier)("    prev_combined_region.start(): " PTR_FORMAT "  prev_combined_region.end(): " PTR_FORMAT,
+                         p2i(prev_combined_region.start()), p2i(prev_combined_region.end()));
+  log_trace(gc, barrier)("    combined_region.start():      " PTR_FORMAT "  combined_region.end(): " PTR_FORMAT,
+                         p2i(combined_region.start()), p2i(combined_region.end()));
+#endif
+
+  // Adjust the size of the committed space
+  if (new_committed.word_size() > prev_committed.word_size()) {
+    // Expand.
+
+    MemRegion delta = MemRegion(prev_committed.end(),
+                                new_committed.word_size() - prev_committed.word_size());
+
+    size_t delta_byte_size = delta.byte_size();
+
+    log_trace(gc, barrier)("CardTable resizing covered region, expanding committed card table region by %zu bytes", delta_byte_size);
+    log_trace(gc, barrier)("    new_committed.start(): " PTR_FORMAT "  new_committed.last(): " PTR_FORMAT,
+                           p2i(new_committed.start()), p2i(new_committed.last()));
+    log_trace(gc, barrier)("    addr_for(start):       " PTR_FORMAT "  addr_for(last):       " PTR_FORMAT,
+                           p2i(addr_for((CardValue*) new_committed.start())),  p2i(addr_for((CardValue*) new_committed.last())));
+    log_trace(gc, barrier)("    commit delta start:    " PTR_FORMAT "  commit delta last:    " PTR_FORMAT,
+                           p2i(delta.start()), p2i(delta.last()));
+
+    os::commit_memory_or_exit((char*)delta.start(),
+                              delta_byte_size,
+                              _page_size,
+                              !ExecMem,
+                              "card table expansion");
+
+    memset(delta.start(), clean_card, delta.byte_size());
+  } else if (new_committed.word_size() < prev_committed.word_size()) {
+    // Shrink.
+    MemRegion delta = MemRegion(new_committed.end(),
+                                prev_committed.word_size() - new_committed.word_size());
+
+    log_trace(gc, barrier)("CardTable resizing covered region, shrinking committed card table region: ");
+    log_trace(gc, barrier)("    new_committed_start: " PTR_FORMAT "  new_committed_last: " PTR_FORMAT,
+                           p2i(new_committed.start()), p2i(new_committed.last()));
+    log_trace(gc, barrier)("    addr_for(start):     " PTR_FORMAT "  addr_for(last):     " PTR_FORMAT,
+                           p2i(addr_for((CardValue*) new_committed.start())),  p2i(addr_for((CardValue*) new_committed.last())));
+    log_trace(gc, barrier)("    uncommit_start:      " PTR_FORMAT "  uncommit_last:      " PTR_FORMAT,
+                           p2i(delta.start()), p2i(delta.last()));
+
+    bool res = os::uncommit_memory((char*)delta.start(),
+                                   delta.byte_size());
+    assert(res, "uncommit should succeed");
+  } else {
+    log_trace(gc, barrier)("Committed card table region unchanged");
+  }
+
+  MemRegion prev_committed_tenured = committed_for_region_in_shared_virtual_space(_covered[old_gen_idx]);
+  MemRegion committed_tenured = committed_for_region_in_shared_virtual_space(new_region0);
+  MemRegion committed_young = committed_for_region_in_shared_virtual_space(new_region1);
+
+  _covered[old_gen_idx] = new_region0;
+  _covered[young_gen_idx] = new_region1;
+
+#ifdef ASSERT
+  log_trace(gc, barrier)("CardTable::resize_covered_region_shared_virtual_space: ");
+  log_trace(gc, barrier)("    prev_committed.start():              " PTR_FORMAT "  prev_committed.last():              " PTR_FORMAT,
+                         p2i(prev_committed.start()), p2i(prev_committed.last()));
+  log_trace(gc, barrier)("    new_committed_start:                 " PTR_FORMAT "  new_committed_last:                 " PTR_FORMAT,
+                         p2i(new_committed.start()), p2i(new_committed.last()));
+  log_trace(gc, barrier)("    committed_tenured.start():           " PTR_FORMAT "  committed_tenured.last():           " PTR_FORMAT,
+                         p2i(committed_tenured.start()), p2i(committed_tenured.last()));
+  log_trace(gc, barrier)("    committed_young.start():             " PTR_FORMAT "  committed_young.last():             " PTR_FORMAT,
+                         p2i(committed_young.start()), p2i(committed_young.last()));
+  log_trace(gc, barrier)("    addr_for(committed_tenured.start()): " PTR_FORMAT "  addr_for(committed_tenured.last()): " PTR_FORMAT,
+                         p2i(addr_for((CardValue*) committed_tenured.start())),  p2i(addr_for((CardValue*) committed_tenured.last())));
+  log_trace(gc, barrier)("    addr_for(committed_young.start()):   " PTR_FORMAT "  addr_for(committed_young.last()):   " PTR_FORMAT,
+                         p2i(addr_for((CardValue*) committed_young.start())),  p2i(addr_for((CardValue*) committed_young.last())));
+
+  for (int idx=0; idx < 2; idx++) {
+    log_trace(gc, barrier)("    _covered[%d].start():           " PTR_FORMAT "  _covered[%d].last(): " PTR_FORMAT,
+                            idx, p2i(_covered[idx].start()),
+                            idx, p2i(_covered[idx].last()));
+    log_trace(gc, barrier)("    byte_for(_covered[%d].start()): " PTR_FORMAT "  byte_for(_covered[%d].last()): " PTR_FORMAT,
+                           idx, p2i(byte_for(_covered[idx].start())),
+                           idx, p2i(byte_for(_covered[idx].last())));
+  }
+#endif
+
+  assert(committed_tenured.last() < committed_young.start(), "last word of tenured must be less than first word of young gen");
+  assert(committed_young.last() <= new_committed.last(), "last word of young gen must be in committed card table memory");
+
+  if (committed_tenured.word_size() > prev_committed_tenured.word_size()) {
+    // Write the clean_card to the entire delta region
+
+    log_trace(gc, barrier)("CardTable expanding covered region for tenured: ");
+    log_trace(gc, barrier)("    _covered[%d].start():          " PTR_FORMAT "  _covered[%d].last():             " PTR_FORMAT,
+                           old_gen_idx, p2i(_covered[old_gen_idx].start()),
+                           old_gen_idx, p2i(_covered[old_gen_idx].last()));
+    log_trace(gc, barrier)("    committed_tenured_start:      " PTR_FORMAT "  committed_tenured_last:         " PTR_FORMAT,
+                           p2i(committed_tenured.start()), p2i(committed_tenured.last()));
+    log_trace(gc, barrier)("    byte_for(_covered[%d].start):  " PTR_FORMAT "  byte_for(_covered[%d].last):     " PTR_FORMAT,
+                           old_gen_idx, p2i(byte_for(_covered[old_gen_idx].start())),
+                           old_gen_idx, p2i(byte_for(_covered[old_gen_idx].last())));
+    log_trace(gc, barrier)("    addr_for(start):              " PTR_FORMAT "  addr_for(last):     " PTR_FORMAT,
+                           p2i(addr_for((CardValue*) committed_tenured.start())),  p2i(addr_for((CardValue*) committed_tenured.last())));
+
+    MemRegion tenured_delta = MemRegion(prev_committed_tenured.end(),
+                                        committed_tenured.word_size() - prev_committed_tenured.word_size());
+
+    memset(tenured_delta.start(), clean_card, tenured_delta.byte_size());
+
+    // If the end of the committed_young region has shrunk, there is nothing else to do.
+    // If it has expanded, then the expansion of the committed card table memory has already
+    // written the clean_card to the expanded region. Nothing else needs to be done in
+    // this case as well.
+  } else if (committed_tenured.word_size() < prev_committed_tenured.word_size()) {
+    // Shrink.
+
+    MemRegion tenured_delta;
+    if (prev_committed_tenured.end() > new_committed.end()) {
+      // Ensure the delta is in the current heap!
+      tenured_delta = MemRegion(committed_tenured.end(), new_committed.end());
+    } else {
+      tenured_delta = MemRegion(committed_tenured.end(),
+                                          prev_committed_tenured.word_size() - committed_tenured.word_size());
+    }
+
+    log_trace(gc, barrier)("CardTable shrinking covered region for tenured, writing clean_card to region: ");
+    log_trace(gc, barrier)("    tenured_delta.start():        " PTR_FORMAT "  tenured_delta.last():           " PTR_FORMAT,
+                           p2i(tenured_delta.start()), p2i(tenured_delta.last()));
+
+    memset(tenured_delta.start(), clean_card, tenured_delta.byte_size());
+  }
+
+#ifdef ASSERT
+  // Touch the last card of the covered region to show that it
+  // is committed (or SEGV).
+  if (is_init_completed()) {
+    (void) (*(volatile CardValue*)byte_for(_covered[young_gen_idx].last()));
+  }
+#endif
+}

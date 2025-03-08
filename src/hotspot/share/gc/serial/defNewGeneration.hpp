@@ -133,6 +133,8 @@ class DefNewGeneration: public Generation {
     return n > alignment ? align_down(n, alignment) : alignment;
   }
 
+  void update_span_based_discoverer_to_committed_range();
+
  public:
   DefNewGeneration(ReservedSpace rs,
                    size_t initial_byte_size,
@@ -217,7 +219,10 @@ class DefNewGeneration: public Generation {
   void reset_scratch();
 
   // GC support
-  void compute_new_size();
+  inline size_t committed_size() const;
+  size_t compute_new_size(size_t* thread_incr_size = nullptr, int* thread_count = nullptr);
+  void resize();
+  void post_shared_virtual_space_resize(size_t young_gen_size_before);
 
   bool collect(bool clear_all_soft_refs);
 
@@ -246,7 +251,8 @@ class DefNewGeneration: public Generation {
   // is true, also mangle the space in debug mode.
   void compute_space_boundaries(uintx minimum_eden_size,
                                 bool clear_space,
-                                bool mangle_space);
+                                bool mangle_space,
+                                char* eden_start);
 
   // Return adjusted new size for NewSizeThreadIncrease.
   // If any overflow happens, revert to previous new size.

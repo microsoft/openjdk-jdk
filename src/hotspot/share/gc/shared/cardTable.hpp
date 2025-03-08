@@ -84,6 +84,7 @@ private:
   void initialize_covered_region(void* region0_start, void* region1_start);
 
   MemRegion committed_for(const MemRegion mr) const;
+  MemRegion committed_for_region_in_shared_virtual_space(const MemRegion mr) const;
 public:
   CardTable(MemRegion whole_heap);
   virtual ~CardTable() = default;
@@ -171,6 +172,9 @@ public:
 
   // Resize one of the regions covered by the remembered set.
   void resize_covered_region(MemRegion new_region);
+
+  // Resize both of the regions covered by the remembered set.
+  void resize_covered_region_in_shared_virtual_space(MemRegion new_region0, MemRegion new_region1);
 
   // *** Card-table-RemSet-specific things.
 
