@@ -25,8 +25,8 @@
 #ifndef SHARE_GC_SERIAL_GENERATION_HPP
 #define SHARE_GC_SERIAL_GENERATION_HPP
 
-#include "gc/serial/serial_globals.hpp"
 #include "gc/shared/collectorCounters.hpp"
+#include "gc/shared/gc_globals.hpp"
 #include "gc/shared/referenceProcessor.hpp"
 #include "gc/shared/space.hpp"
 #include "logging/log.hpp"
