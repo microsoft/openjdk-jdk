@@ -459,6 +459,7 @@ bool SerialHeap::do_young_collection(bool clear_soft_refs) {
     size_t young_gen_size_before = _shared_virtual_space->young_region().byte_size();
     size_t young_gen_size = _young_gen->compute_new_size();
 
+    // execution will continue with the existing heap generation sizes if resizing the VirtualSpace fails
     bool success = _shared_virtual_space->resize(young_gen_size);
     if (success) {
       _young_gen->post_shared_virtual_space_resize(young_gen_size_before);
@@ -713,6 +714,7 @@ void SerialHeap::do_full_collection(bool clear_all_soft_refs) {
     size_t tenured_gen_size = _old_gen->compute_new_size();
     size_t young_gen_size = _young_gen->compute_new_size();
 
+    // execution will continue with the existing heap generation sizes if resizing the VirtualSpace fails
     bool success = _shared_virtual_space->resize(tenured_gen_size, young_gen_size);
     if (success) {
       _young_gen->post_shared_virtual_space_resize(young_gen_size_before);
