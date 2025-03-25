@@ -324,10 +324,10 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap
   assert(_covered[0].start() != nullptr, "_covered[0].start() must not be null");
   assert(_covered[1].start() == _covered[0].end(), "_covered[1] must start at the end of _covered[0]");
 
-  const int old_gen_idx = 0, young_gen_idx = 1;
+  const int tenured_idx = 0, young_idx = 1;
 
   // We don't allow changes to the start of region0, only the end.
-  assert(_covered[old_gen_idx].start() == new_heap_region0.start(), "start of region0 must not change");
+  assert(_covered[tenured_idx].start() == new_heap_region0.start(), "start of region0 must not change");
 
   assert(new_heap_region1.start() == new_heap_region0.end(), "start of region1 must start at the end of region0");
 
@@ -405,12 +405,12 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap
     log_trace(gc, barrier)("Committed card table region unchanged");
   }
 
-  MemRegion prev_committed_tenured = committed_for_region_in_shared_virtual_space(_covered[old_gen_idx]);
+  MemRegion prev_committed_tenured = committed_for_region_in_shared_virtual_space(_covered[tenured_idx]);
   MemRegion committed_tenured = committed_for_region_in_shared_virtual_space(new_heap_region0);
   MemRegion committed_young = committed_for_region_in_shared_virtual_space(new_heap_region1);
 
-  _covered[old_gen_idx] = new_heap_region0;
-  _covered[young_gen_idx] = new_heap_region1;
+  _covered[tenured_idx] = new_heap_region0;
+  _covered[young_idx] = new_heap_region1;
 
 #ifdef ASSERT
   log_trace(gc, barrier)("CardTable::resize_covered_region_shared_virtual_space: ");
@@ -445,13 +445,13 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap
 
     log_trace(gc, barrier)("CardTable expanding covered region for tenured: ");
     log_trace(gc, barrier)("    _covered[%d].start():          " PTR_FORMAT "  _covered[%d].last():             " PTR_FORMAT,
-                           old_gen_idx, p2i(_covered[old_gen_idx].start()),
-                           old_gen_idx, p2i(_covered[old_gen_idx].last()));
+                           tenured_idx, p2i(_covered[tenured_idx].start()),
+                           tenured_idx, p2i(_covered[tenured_idx].last()));
     log_trace(gc, barrier)("    committed_tenured_start:      " PTR_FORMAT "  committed_tenured_last:         " PTR_FORMAT,
                            p2i(committed_tenured.start()), p2i(committed_tenured.last()));
     log_trace(gc, barrier)("    byte_for(_covered[%d].start):  " PTR_FORMAT "  byte_for(_covered[%d].last):     " PTR_FORMAT,
-                           old_gen_idx, p2i(byte_for(_covered[old_gen_idx].start())),
-                           old_gen_idx, p2i(byte_for(_covered[old_gen_idx].last())));
+                           tenured_idx, p2i(byte_for(_covered[tenured_idx].start())),
+                           tenured_idx, p2i(byte_for(_covered[tenured_idx].last())));
     log_trace(gc, barrier)("    addr_for(start):              " PTR_FORMAT "  addr_for(last):     " PTR_FORMAT,
                            p2i(addr_for((CardValue*) committed_tenured.start())),  p2i(addr_for((CardValue*) committed_tenured.last())));
 
@@ -487,7 +487,7 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap
   // Touch the last card of the covered region to show that it
   // is committed (or SEGV).
   if (is_init_completed()) {
-    (void) (*(volatile CardValue*)byte_for(_covered[young_gen_idx].last()));
+    (void) (*(volatile CardValue*)byte_for(_covered[young_idx].last()));
   }
 #endif
 }
