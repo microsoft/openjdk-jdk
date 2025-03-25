@@ -304,22 +304,22 @@ MemRegion CardTable::committed_for_region_in_shared_virtual_space(const MemRegio
   return MemRegion(addr_l, addr_r);
 }
 
-void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_region0, MemRegion new_region1) {
+void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap_region0, MemRegion new_heap_region1) {
 #ifdef ASSERT
   log_trace(gc, barrier)("CardTable::resize_covered_region_shared_virtual_space: ");
   log_trace(gc, barrier)("   _whole_heap.start(): " PTR_FORMAT " _whole_heap.end(): " PTR_FORMAT,
                          p2i(_whole_heap.start()), p2i(_whole_heap.end()));
-  log_trace(gc, barrier)("   new_region0.start(): " PTR_FORMAT " new_region0.end(): " PTR_FORMAT,
-                         p2i(new_region0.start()), p2i(new_region0.end()));
-  log_trace(gc, barrier)("   new_region1.start(): " PTR_FORMAT " new_region1.end(): " PTR_FORMAT,
-                         p2i(new_region1.start()), p2i(new_region1.end()));
+  log_trace(gc, barrier)("   new_heap_region0.start(): " PTR_FORMAT " new_heap_region0.end(): " PTR_FORMAT,
+                         p2i(new_heap_region0.start()), p2i(new_heap_region0.end()));
+  log_trace(gc, barrier)("   new_heap_region1.start(): " PTR_FORMAT " new_heap_region1.end(): " PTR_FORMAT,
+                         p2i(new_heap_region1.start()), p2i(new_heap_region1.end()));
 #endif
 
   assert(UseSerialGC, "only the serial collector uses this method");
   assert(SharedSerialGCVirtualSpace, "the SharedSerialGCVirtualSpace flag must be enabled");
-  assert(_whole_heap.contains(new_region0),
+  assert(_whole_heap.contains(new_heap_region0),
          "attempt to cover area not in reserved area (region 0)");
-  assert(_whole_heap.contains(new_region1),
+  assert(_whole_heap.contains(new_heap_region1),
          "attempt to cover area not in reserved area (region 1)");
   assert(_covered[0].start() != nullptr, "_covered[0].start() must not be null");
   assert(_covered[1].start() == _covered[0].end(), "_covered[1] must start at the end of _covered[0]");
@@ -327,9 +327,9 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_regi
   const int old_gen_idx = 0, young_gen_idx = 1;
 
   // We don't allow changes to the start of region0, only the end.
-  assert(_covered[old_gen_idx].start() == new_region0.start(), "start of region0 must not change");
+  assert(_covered[old_gen_idx].start() == new_heap_region0.start(), "start of region0 must not change");
 
-  assert(new_region1.start() == new_region0.end(), "start of region1 must start at the end of region0");
+  assert(new_heap_region1.start() == new_heap_region0.end(), "start of region1 must start at the end of region0");
 
 #ifdef ASSERT
   log_trace(gc, barrier)("CardTable resizing covered region in shared virtual space: ");
@@ -341,15 +341,15 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_regi
 
     log_trace(gc, barrier)("   After  _covered[%d].start(): " PTR_FORMAT
                            " _covered[%d].end(): " PTR_FORMAT,
-                           idx, p2i(idx == 0 ? new_region0.start() : new_region1.start()),
-                           idx, p2i(idx == 0 ? new_region0.end() : new_region1.end()));
+                           idx, p2i(idx == 0 ? new_heap_region0.start() : new_heap_region1.start()),
+                           idx, p2i(idx == 0 ? new_heap_region0.end() : new_heap_region1.end()));
   }
 #endif
 
   MemRegion prev_combined_region = _covered[0]._union(_covered[1]);
   MemRegion prev_committed = committed_for_region_in_shared_virtual_space(prev_combined_region);
 
-  MemRegion combined_region = new_region0._union(new_region1);
+  MemRegion combined_region = new_heap_region0._union(new_heap_region1);
   MemRegion new_committed = committed_for_region_in_shared_virtual_space(combined_region);
   assert(new_committed.start() == prev_committed.start(), "start of committed card table memory must not change");
 
@@ -406,11 +406,11 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_regi
   }
 
   MemRegion prev_committed_tenured = committed_for_region_in_shared_virtual_space(_covered[old_gen_idx]);
-  MemRegion committed_tenured = committed_for_region_in_shared_virtual_space(new_region0);
-  MemRegion committed_young = committed_for_region_in_shared_virtual_space(new_region1);
+  MemRegion committed_tenured = committed_for_region_in_shared_virtual_space(new_heap_region0);
+  MemRegion committed_young = committed_for_region_in_shared_virtual_space(new_heap_region1);
 
-  _covered[old_gen_idx] = new_region0;
-  _covered[young_gen_idx] = new_region1;
+  _covered[old_gen_idx] = new_heap_region0;
+  _covered[young_gen_idx] = new_heap_region1;
 
 #ifdef ASSERT
   log_trace(gc, barrier)("CardTable::resize_covered_region_shared_virtual_space: ");
