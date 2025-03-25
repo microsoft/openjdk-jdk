@@ -32,7 +32,7 @@
 
 class SerialGCVirtualSpace: public CHeapObj<mtInternal> {
 private:
-  VirtualSpace _ahs_virtual_space;
+  VirtualSpace _virtual_space;
   MemRegion _heap_region;
 
   MemRegion _tenured_region;

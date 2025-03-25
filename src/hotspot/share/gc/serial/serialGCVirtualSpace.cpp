@@ -41,18 +41,18 @@ void SerialGCVirtualSpace::initialize(ReservedSpace rs, size_t old_size, size_t 
   assert(new_size != 0, "new_size must not be 0");
 
   size_t initial_virtual_space_size = old_size + new_size;
-  if (!_ahs_virtual_space.initialize(rs, initial_virtual_space_size)) {
+  if (!_virtual_space.initialize(rs, initial_virtual_space_size)) {
     vm_exit_during_initialization("Could not reserve enough space for object heap");
   }
 
-  _heap_region = MemRegion((HeapWord*)_ahs_virtual_space.low(), (HeapWord*)_ahs_virtual_space.high());
+  _heap_region = MemRegion((HeapWord*)_virtual_space.low(), (HeapWord*)_virtual_space.high());
 
   // Mangle all of the initial generations.
   if (ZapUnusedHeapArea) {
     SpaceMangler::mangle_region(_heap_region);
   }
 
-  MemRegion tenured_region((HeapWord*)_ahs_virtual_space.low(), heap_word_size(OldSize));
+  MemRegion tenured_region((HeapWord*)_virtual_space.low(), heap_word_size(OldSize));
   assert(tenured_region.byte_size() == old_size, "_tenured_region size in bytes must match old_size");
   set_tenured_region(tenured_region);
 
@@ -62,7 +62,7 @@ void SerialGCVirtualSpace::initialize(ReservedSpace rs, size_t old_size, size_t 
 }
 
 size_t SerialGCVirtualSpace::committed_size() {
-  return _ahs_virtual_space.committed_size();
+  return _virtual_space.committed_size();
 }
 
 void SerialGCVirtualSpace::set_tenured_region(MemRegion region) {
@@ -109,7 +109,7 @@ bool SerialGCVirtualSpace::resize_virtual_space(size_t tenured_gen_size, size_t 
   }
 
   if (success) {
-    _heap_region = MemRegion((HeapWord*)_ahs_virtual_space.low(), (HeapWord*)_ahs_virtual_space.high());
+    _heap_region = MemRegion((HeapWord*)_virtual_space.low(), (HeapWord*)_virtual_space.high());
   }
   return success;
 }
@@ -161,14 +161,14 @@ bool SerialGCVirtualSpace::resize(size_t young_gen_size) {
 }
 
 bool SerialGCVirtualSpace::expand_by(size_t bytes, bool pre_touch) {
-  HeapWord* prev_high = (HeapWord*)_ahs_virtual_space.high();
-  bool success = _ahs_virtual_space.expand_by(bytes, pre_touch);
+  HeapWord* prev_high = (HeapWord*)_virtual_space.high();
+  bool success = _virtual_space.expand_by(bytes, pre_touch);
 
   if (success) {
-    _heap_region = MemRegion((HeapWord*)_ahs_virtual_space.low(), (HeapWord*)_ahs_virtual_space.high());
+    _heap_region = MemRegion((HeapWord*)_virtual_space.low(), (HeapWord*)_virtual_space.high());
 
     if (ZapUnusedHeapArea) {
-      HeapWord* new_high = (HeapWord*) _ahs_virtual_space.high();
+      HeapWord* new_high = (HeapWord*) _virtual_space.high();
       MemRegion mangle_region(prev_high, new_high);
       SpaceMangler::mangle_region(mangle_region);
     }
@@ -178,6 +178,6 @@ bool SerialGCVirtualSpace::expand_by(size_t bytes, bool pre_touch) {
 }
 
 void SerialGCVirtualSpace::shrink_by(size_t size) {
-  _ahs_virtual_space.shrink_by(size);
-  _heap_region = MemRegion((HeapWord*)_ahs_virtual_space.low(), (HeapWord*)_ahs_virtual_space.high());
+  _virtual_space.shrink_by(size);
+  _heap_region = MemRegion((HeapWord*)_virtual_space.low(), (HeapWord*)_virtual_space.high());
 }
