@@ -1465,7 +1465,7 @@ set to `aarch64-unknown-cygwin`. Configure the build with `--openjdk-target`:
 ```
 bash configure \
   --with-boot-jdk=$BOOT_JDK \
-  --openjdk-target=aarch64-unknown-cygwin \
+  --openjdk-target=aarch64-unknown-cygwin
 ```
 
 ## Build Performance
