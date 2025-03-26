@@ -1457,9 +1457,9 @@ sh ./configure --with-jvm-variants=server \
 
 and run `make` normally.
 
-#### Building for Windows ARM64
+#### Building for Windows AArch64
 
-To generate Windows ARM64 builds using Cygwin, the target platform needs to be
+To generate Windows AArch64 builds using Cygwin, the target platform needs to be
 set to `aarch64-unknown-cygwin`. Configure the build with `--openjdk-target`:
 
 ```
