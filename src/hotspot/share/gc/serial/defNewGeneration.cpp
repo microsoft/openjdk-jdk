@@ -141,12 +141,14 @@ class CLDScanClosure: public CLDClosure {
 };
 
 class IsAliveClosure: public BoolObjectClosure {
-  HeapWord*         _young_gen_end;
+  HeapWord*         _old_gen_boundary;
 public:
-  IsAliveClosure(DefNewGeneration* g): _young_gen_end(g->reserved().end()) {}
+  IsAliveClosure(DefNewGeneration* g): _old_gen_boundary(g->old_gen_boundary()) {}
 
   bool do_object_b(oop p) {
-    return cast_from_oop<HeapWord*>(p) >= _young_gen_end || p->is_forwarded();
+    bool is_in_lower_region = cast_from_oop<HeapWord*>(p) < _old_gen_boundary;
+    bool is_in_young_gen = SwapSerialGCGenerations ^ is_in_lower_region;
+    return !is_in_young_gen || p->is_forwarded();
   }
 };
 
@@ -173,11 +175,12 @@ class AdjustWeakRootClosure: public OffHeapScanClosure {
 
 class KeepAliveClosure: public OopClosure {
   DefNewGeneration* _young_gen;
-  HeapWord*         _young_gen_end;
+  HeapWord*         _old_gen_boundary;
   CardTableRS* _rs;
 
   bool is_in_young_gen(void* p) const {
-    return p < _young_gen_end;
+    bool is_in_lower_region = p < _old_gen_boundary;
+    return SwapSerialGCGenerations ^ is_in_lower_region;
   }
 
   template <class T>
@@ -197,7 +200,7 @@ class KeepAliveClosure: public OopClosure {
 public:
   KeepAliveClosure(DefNewGeneration* g) :
     _young_gen(g),
-    _young_gen_end(g->reserved().end()),
+    _old_gen_boundary(g->old_gen_boundary()),
     _rs(SerialHeap::heap()->rem_set()) {}
 
   void do_oop(oop* p)       { do_oop_work(p); }
@@ -248,6 +251,7 @@ DefNewGeneration::DefNewGeneration(ReservedSpace rs,
   _eden_space = new ContiguousSpace();
   _from_space = new ContiguousSpace();
   _to_space   = new ContiguousSpace();
+  _old_gen_boundary = _reserved.end();
 
   // Compute the maximum eden and survivor space sizes. These sizes
   // are computed assuming the entire reserved space is committed.
