@@ -794,7 +794,10 @@ void SerialHeap::do_full_collection_no_gc_locker(bool clear_all_soft_refs) {
 }
 
 bool SerialHeap::is_in_young(const void* p) const {
-  bool result = p < _old_gen->reserved().start();
+  ptrdiff_t diff = (HeapWord*)(p) - _old_gen_boundary;
+  bool is_in_old_gen = SwapSerialGCGenerations ^ (diff < 0);
+  bool result = !is_in_old_gen;
+
   assert(result == _young_gen->is_in_reserved(p),
          "incorrect test - result=%d, p=" PTR_FORMAT, result, p2i(p));
   return result;
