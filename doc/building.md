@@ -1459,16 +1459,6 @@ and run `make` normally.
 
 #### Building for Windows AArch64
 
-To generate Windows AArch64 builds using Cygwin on a Windows AArch64 machine,
-use the `--build` option to specify a native build (this argument is required
-because the machine type supported by Cygwin is x86_64):
-
-```
-bash configure \
-  --with-boot-jdk=$BOOT_JDK \
-  --build=aarch64-unknown-cygwin
-```
-
 To generate Windows AArch64 builds using Cygwin on a Windows x64 machine,
 the target platform needs to be set to `aarch64-unknown-cygwin` to enable
 cross compilation. Configure the build with `--openjdk-target`:
