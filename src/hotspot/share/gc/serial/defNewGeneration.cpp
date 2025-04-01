@@ -145,9 +145,9 @@ public:
   IsAliveClosure(DefNewGeneration* g): _old_gen_boundary(g->old_gen_boundary()) {}
 
   bool do_object_b(oop p) {
-    ptrdiff_t diff = cast_from_oop<HeapWord*>(p) - _old_gen_boundary;
-    bool is_in_old_gen = SwapSerialGCGenerations ^ (diff < 0);
-    return is_in_old_gen || p->is_forwarded();
+    bool is_in_lower_region = cast_from_oop<HeapWord*>(p) < _old_gen_boundary;
+    bool is_in_young_gen = SwapSerialGCGenerations ^ is_in_lower_region;
+    return !is_in_young_gen || p->is_forwarded();
   }
 };
 
@@ -178,9 +178,8 @@ class KeepAliveClosure: public OopClosure {
   CardTableRS* _rs;
 
   bool is_in_young_gen(void* p) const {
-    ptrdiff_t diff = (HeapWord*)(p) - _old_gen_boundary;
-    bool is_in_old_gen = SwapSerialGCGenerations ^ (diff < 0);
-    return !is_in_old_gen;
+    bool is_in_lower_region = cast_from_oop<HeapWord*>(p) < _old_gen_boundary;
+    return SwapSerialGCGenerations ^ is_in_lower_region;
   }
 
   template <class T>

@@ -39,9 +39,8 @@ public:
     _old_gen_boundary(young_gen->old_gen_boundary()) {}
 
   bool is_in_young_gen(void* p) const {
-    ptrdiff_t diff = (HeapWord*)(p) - _old_gen_boundary;
-    bool is_in_old_gen = SwapSerialGCGenerations ^ (diff < 0);
-    return !is_in_old_gen;
+    bool is_in_lower_region = p < _old_gen_boundary;
+    return SwapSerialGCGenerations ^ is_in_lower_region;
   }
 
   template <typename T, typename Func>
