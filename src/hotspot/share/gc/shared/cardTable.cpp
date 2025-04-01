@@ -329,7 +329,7 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap
   // We don't allow changes to the start of region0, only the end.
   assert(_covered[tenured_idx].start() == new_heap_region0.start(), "start of region0 must not change");
 
-  assert(new_heap_region1.start() == new_heap_region0.end(), "start of region1 must start at the end of region0");
+  assert(new_heap_region1.start() == new_heap_region0.end(), "region1 must start at the end of region0");
 
 #ifdef ASSERT
   log_trace(gc, barrier)("CardTable resizing covered region in shared virtual space: ");
