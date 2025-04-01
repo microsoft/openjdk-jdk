@@ -192,12 +192,16 @@ jint SerialHeap::initialize() {
   if (SwapSerialGCGenerations) {
     ReservedSpace old_rs = heap_rs.first_part(MaxOldSize, GenAlignment);
     ReservedSpace young_rs = heap_rs.last_part(MaxOldSize, GenAlignment);
+    _old_gen_boundary = young_rs.base();
+
     _rem_set->initialize(old_rs.base(), young_rs.base());
     _young_gen = new DefNewGeneration(young_rs, NewSize, MinNewSize, MaxNewSize);
     _old_gen = new TenuredGeneration(old_rs, OldSize, MinOldSize, MaxOldSize, rem_set());
   } else {
     ReservedSpace young_rs = heap_rs.first_part(MaxNewSize, GenAlignment);
     ReservedSpace old_rs = heap_rs.last_part(MaxNewSize, GenAlignment);
+    _old_gen_boundary = old_rs.base();
+
     _rem_set->initialize(young_rs.base(), old_rs.base());
     _young_gen = new DefNewGeneration(young_rs, NewSize, MinNewSize, MaxNewSize);
     _old_gen = new TenuredGeneration(old_rs, OldSize, MinOldSize, MaxOldSize, rem_set());
