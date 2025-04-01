@@ -178,7 +178,7 @@ class KeepAliveClosure: public OopClosure {
   CardTableRS* _rs;
 
   bool is_in_young_gen(void* p) const {
-    bool is_in_lower_region = cast_from_oop<HeapWord*>(p) < _old_gen_boundary;
+    bool is_in_lower_region = p < _old_gen_boundary;
     return SwapSerialGCGenerations ^ is_in_lower_region;
   }
 
