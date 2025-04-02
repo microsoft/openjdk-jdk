@@ -238,19 +238,20 @@ DefNewGeneration::DefNewGeneration(ReservedSpace rs,
   if (SharedSerialGCVirtualSpace) {
     _committed = gch->shared_virtual_space()->young_region();
     size = gch->shared_virtual_space()->max_new_size();
+    _gen_boundary = _committed.start();
   } else {
     HeapWord* committed_low = (HeapWord*)_virtual_space.low();
     HeapWord* committed_high = (HeapWord*)_virtual_space.high();
     _committed = MemRegion(committed_low, committed_high);
     size = _virtual_space.reserved_size();
-  }
+   _gen_boundary = SwapSerialGCGenerations ? _reserved.start() : _reserved.end();
+}
 
   gch->rem_set()->resize_covered_region(_committed);
 
   _eden_space = new ContiguousSpace();
   _from_space = new ContiguousSpace();
   _to_space   = new ContiguousSpace();
-  _gen_boundary = SwapSerialGCGenerations ? _reserved.start() : _reserved.end();
 
   // Compute the maximum eden and survivor space sizes. These sizes
   // are computed assuming the entire reserved space is committed.
@@ -550,6 +551,7 @@ void DefNewGeneration::update_span_based_discoverer_to_committed_range() {
 void DefNewGeneration::post_shared_virtual_space_resize(size_t young_gen_size_before) {
   assert(SharedSerialGCVirtualSpace, "must only be called when SharedSerialGCVirtualSpace is enabled");
   _committed = SerialHeap::heap()->shared_virtual_space()->young_region();
+  _gen_boundary = _committed.start();
   update_span_based_discoverer_to_committed_range();
 
   compute_space_boundaries(eden()->used(),
@@ -658,6 +660,7 @@ bool DefNewGeneration::collect(bool clear_all_soft_refs) {
   SerialHeap* heap = SerialHeap::heap();
 
   assert(to()->is_empty(), "Else not collection_attempt_is_safe");
+  assert(!SharedSerialGCVirtualSpace || _gen_boundary != nullptr, "_gen_boundary must not be null when SharedSerialGCVirtualSpace is enabled");
   _gc_timer->register_gc_start();
   _gc_tracer->report_gc_start(heap->gc_cause(), _gc_timer->gc_start());
   _ref_processor->start_discovery(clear_all_soft_refs);

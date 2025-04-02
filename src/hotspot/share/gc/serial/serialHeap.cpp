@@ -211,7 +211,6 @@ jint SerialHeap::initialize() {
       _rem_set->initialize(old_rs.base(), young_rs.base());
     }
 
-    _rem_set->initialize(old_rs.base(), young_rs.base());
     _young_gen = new DefNewGeneration(young_rs, NewSize, MinNewSize, MaxNewSize);
     _old_gen = new TenuredGeneration(old_rs, OldSize, MinOldSize, MaxOldSize, rem_set());
   } else {
@@ -722,8 +721,12 @@ void SerialHeap::do_full_collection(bool clear_all_soft_refs) {
     bool success = _shared_virtual_space->resize(tenured_gen_size, young_gen_size);
     if (success) {
       _young_gen->post_shared_virtual_space_resize(young_gen_size_before);
+      MemRegion young_region = _shared_virtual_space->young_region();
+      _gen_boundary = (char*)young_region.start();
+      log_debug(gc, alloc)("Shared virtual space generation boundary set: " PTR_FORMAT, p2i(_gen_boundary));
+
       rem_set()->resize_covered_region_in_shared_virtual_space(_shared_virtual_space->tenured_region(),
-                                                          _shared_virtual_space->young_region());
+                                                               young_region);
     }
   } else {
     _old_gen->resize();
