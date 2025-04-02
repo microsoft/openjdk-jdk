@@ -241,7 +241,7 @@ DefNewGeneration::DefNewGeneration(ReservedSpace rs,
   _eden_space = new ContiguousSpace();
   _from_space = new ContiguousSpace();
   _to_space   = new ContiguousSpace();
-  _old_gen_boundary = _reserved.end();
+  _old_gen_boundary = SwapSerialGCGenerations ? _reserved.start() : _reserved.end();
 
   // Compute the maximum eden and survivor space sizes. These sizes
   // are computed assuming the entire reserved space is committed.
