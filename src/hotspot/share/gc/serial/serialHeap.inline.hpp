@@ -32,14 +32,14 @@
 
 class ScavengeHelper {
   DefNewGeneration* _young_gen;
-  HeapWord*         _old_gen_boundary;
+  HeapWord*         _gen_boundary;
 public:
   ScavengeHelper(DefNewGeneration* young_gen) :
     _young_gen(young_gen),
-    _old_gen_boundary(young_gen->old_gen_boundary()) {}
+    _gen_boundary(young_gen->gen_boundary()) {}
 
   bool is_in_young_gen(void* p) const {
-    bool is_in_lower_region = p < _old_gen_boundary;
+    bool is_in_lower_region = p < _gen_boundary;
     return SwapSerialGCGenerations ^ is_in_lower_region;
   }
 
