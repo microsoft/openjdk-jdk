@@ -1457,6 +1457,18 @@ sh ./configure --with-jvm-variants=server \
 
 and run `make` normally.
 
+#### Building for Windows AArch64
+
+To generate Windows AArch64 builds using Cygwin on a Windows x64 machine,
+the target platform needs to be set to `aarch64-unknown-cygwin` to enable
+cross compilation. Configure the build with `--openjdk-target`:
+
+```
+bash configure \
+  --with-boot-jdk=$BOOT_JDK \
+  --openjdk-target=aarch64-unknown-cygwin
+```
+
 ## Build Performance
 
 Building the JDK requires a lot of horsepower. Some of the build tools can be
