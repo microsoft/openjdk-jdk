@@ -437,8 +437,15 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap
   }
 #endif
 
-  assert(committed_card_table_mem_for_tenured.last() < committed_card_table_mem_for_young.start(), "last word of tenured must be less than first word of young gen");
-  assert(committed_card_table_mem_for_young.last() <= card_table_mem_to_commit.last(), "last word of young gen must be in committed card table memory");
+  assert(committed_card_table_mem_for_tenured.last() < committed_card_table_mem_for_young.start(),
+         "last word of tenured (" PTR_FORMAT ") must be less than first word of young gen (" PTR_FORMAT ")",
+         p2i(committed_card_table_mem_for_tenured.last()),
+         p2i(committed_card_table_mem_for_young.start()));
+
+  assert(committed_card_table_mem_for_young.last() <= card_table_mem_to_commit.last(),
+         "last word of young gen (" PTR_FORMAT ") must be in committed card table memory (" PTR_FORMAT ")",
+         p2i(committed_card_table_mem_for_young.last()),
+         p2i(card_table_mem_to_commit.last()));
 
   if (committed_card_table_mem_for_tenured.word_size() > prev_committed_card_table_mem_for_tenured.word_size()) {
     // Write the clean_card to the entire delta region
