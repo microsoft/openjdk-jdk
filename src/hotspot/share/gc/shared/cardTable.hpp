@@ -84,7 +84,7 @@ private:
   void initialize_covered_region(void* region0_start, void* region1_start);
 
   MemRegion committed_for(const MemRegion mr) const;
-  MemRegion committed_card_table_mem_for_shared_virtual_space_region(const MemRegion mr) const;
+  MemRegion card_table_mem_for_shared_virtual_space_region(const MemRegion mr) const;
 public:
   CardTable(MemRegion whole_heap);
   virtual ~CardTable() = default;

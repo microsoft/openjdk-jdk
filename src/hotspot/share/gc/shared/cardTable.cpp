@@ -275,10 +275,10 @@ void CardTable::print_on(outputStream* st) const {
                p2i(_byte_map), p2i(_byte_map + _byte_map_size), p2i(_byte_map_base));
 }
 
-MemRegion CardTable::committed_card_table_mem_for_shared_virtual_space_region(const MemRegion mr) const {
+MemRegion CardTable::card_table_mem_for_shared_virtual_space_region(const MemRegion mr) const {
   HeapWord* addr_l = (HeapWord*)byte_for(mr.start());
 
-  log_trace(gc, barrier)("CardTable::committed_card_table_mem_for_shared_virtual_space_region: ");
+  log_trace(gc, barrier)("CardTable::card_table_mem_for_shared_virtual_space_region: ");
   log_trace(gc, barrier)("    mr.start():                    " PTR_FORMAT "  mr.last(): " PTR_FORMAT,
                          p2i(mr.start()), p2i(mr.last()));
   log_trace(gc, barrier)("    byte_for(mr.start()):          " PTR_FORMAT, p2i(addr_l));
@@ -347,10 +347,10 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap
 #endif
 
   MemRegion prev_heap_region = _covered[0]._union(_covered[1]);
-  MemRegion prev_committed_card_table_mem = committed_card_table_mem_for_shared_virtual_space_region(prev_heap_region);
+  MemRegion prev_committed_card_table_mem = card_table_mem_for_shared_virtual_space_region(prev_heap_region);
 
   MemRegion heap_region = new_heap_region0._union(new_heap_region1);
-  MemRegion card_table_mem_to_commit = committed_card_table_mem_for_shared_virtual_space_region(heap_region);
+  MemRegion card_table_mem_to_commit = card_table_mem_for_shared_virtual_space_region(heap_region);
   assert(card_table_mem_to_commit.start() == prev_committed_card_table_mem.start(), "start of committed card table memory must not change");
 
 #ifdef ASSERT
@@ -405,9 +405,9 @@ void CardTable::resize_covered_region_in_shared_virtual_space(MemRegion new_heap
     log_trace(gc, barrier)("Committed card table region unchanged");
   }
 
-  MemRegion prev_committed_card_table_mem_for_tenured = committed_card_table_mem_for_shared_virtual_space_region(_covered[tenured_idx]);
-  MemRegion committed_card_table_mem_for_tenured = committed_card_table_mem_for_shared_virtual_space_region(new_heap_region0);
-  MemRegion committed_card_table_mem_for_young = committed_card_table_mem_for_shared_virtual_space_region(new_heap_region1);
+  MemRegion prev_committed_card_table_mem_for_tenured = card_table_mem_for_shared_virtual_space_region(_covered[tenured_idx]);
+  MemRegion committed_card_table_mem_for_tenured = card_table_mem_for_shared_virtual_space_region(new_heap_region0);
+  MemRegion committed_card_table_mem_for_young = card_table_mem_for_shared_virtual_space_region(new_heap_region1);
 
   _covered[tenured_idx] = new_heap_region0;
   _covered[young_idx] = new_heap_region1;
