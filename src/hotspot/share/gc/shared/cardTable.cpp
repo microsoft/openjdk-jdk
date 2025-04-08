@@ -279,13 +279,13 @@ MemRegion CardTable::committed_card_table_mem_for_shared_virtual_space_region(co
   HeapWord* addr_l = (HeapWord*)byte_for(mr.start());
 
   log_trace(gc, barrier)("CardTable::committed_card_table_mem_for_shared_virtual_space_region: ");
-  log_trace(gc, barrier)("    mr.start():                          " PTR_FORMAT "  mr.last():                          " PTR_FORMAT,
+  log_trace(gc, barrier)("    mr.start():                    " PTR_FORMAT "  mr.last(): " PTR_FORMAT,
                          p2i(mr.start()), p2i(mr.last()));
-  log_trace(gc, barrier)("    byte_for(mr.start()):                " PTR_FORMAT, p2i(addr_l));
+  log_trace(gc, barrier)("    byte_for(mr.start()):          " PTR_FORMAT, p2i(addr_l));
 
   if (mr.start() == _covered[0].start()) {
     addr_l = (HeapWord*)align_down(addr_l, _page_size);
-    log_trace(gc, barrier)("    aligned byte_for(mr.start()):        " PTR_FORMAT, p2i(addr_l));
+    log_trace(gc, barrier)("    aligned byte_for(mr.start()):  " PTR_FORMAT, p2i(addr_l));
   }
 
   HeapWord* addr_r;
@@ -293,11 +293,11 @@ MemRegion CardTable::committed_card_table_mem_for_shared_virtual_space_region(co
     addr_r = addr_l;
   } else {
     addr_r = (HeapWord*)byte_after(mr.last());
-    log_trace(gc, barrier)("    byte_after(mr.last()):               " PTR_FORMAT, p2i(addr_r));
+    log_trace(gc, barrier)("    byte_after(mr.last()):         " PTR_FORMAT, p2i(addr_r));
 
     if (mr.start() == _covered[1].start()) {
       addr_r = (HeapWord*)align_up(addr_r, _page_size);
-      log_trace(gc, barrier)("    aligned byte_after(mr.last()):       " PTR_FORMAT, p2i(addr_r));
+      log_trace(gc, barrier)("    aligned byte_after(mr.last()): " PTR_FORMAT, p2i(addr_r));
     }
   }
 
