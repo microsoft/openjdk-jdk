@@ -1459,14 +1459,15 @@ and run `make` normally.
 
 #### Building for Windows AArch64
 The Visual Studio Build Tools can be used for building the JDK without a full
-Visual Studio installation. Use these arguments to set up the Visual Studio
-2022 Build Tools on a Windows AArch64 machine for a native build:
+Visual Studio installation. To set up the Visual Studio 2022 Build Tools on a
+Windows AArch64 machine for a native build, launch the installer as follows
+in a Windows command prompt:
 
 ```
-vs_buildtools.exe --quiet --wait --norestart --nocache \
---installPath "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools" \
---add Microsoft.VisualStudio.Component.VC.CoreBuildTools \
---add Microsoft.VisualStudio.Component.VC.Tools.ARM64 \
+vs_buildtools.exe --quiet --wait --norestart --nocache ^
+--installPath "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools" ^
+--add Microsoft.VisualStudio.Component.VC.CoreBuildTools ^
+--add Microsoft.VisualStudio.Component.VC.Tools.ARM64 ^
 --add Microsoft.VisualStudio.Component.Windows11SDK.22621
 ```
 
