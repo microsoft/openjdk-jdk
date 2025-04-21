@@ -221,7 +221,7 @@ class DefNewGeneration: public Generation {
   void reset_scratch();
 
   // GC support
-  inline size_t committed_size() const;
+  size_t committed_size() const;
   size_t compute_new_size(size_t* thread_incr_size = nullptr, int* thread_count = nullptr);
   void resize();
   void post_shared_virtual_space_resize(size_t young_gen_size_before);
