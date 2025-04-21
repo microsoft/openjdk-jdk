@@ -151,7 +151,8 @@ bool SerialGCVirtualSpace::resize(size_t young_gen_size) {
   }
 
   size_t new_capacity = committed_size();
-  log_trace(gc, heap)("SerialGCVirtualSpace size %6.1fK->%6.1fK [young=%6.1fK,tenured=%6.1fK]",
+  log_trace(gc, heap)("SerialGCVirtualSpace size %s: %6.1fK->%6.1fK [young=%6.1fK,tenured=%6.1fK]",
+                      new_capacity == prev_capacity ? "unchanged" : "changed",
                       prev_capacity / (double) K,
                       new_capacity / (double) K,
                       _young_region.byte_size() / (double) K,
