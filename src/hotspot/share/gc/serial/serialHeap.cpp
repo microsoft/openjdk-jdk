@@ -459,15 +459,17 @@ bool SerialHeap::do_young_collection(bool clear_soft_refs) {
   }
 
   if (SharedSerialGCVirtualSpace) {
-    size_t young_gen_size_before = _shared_virtual_space->young_region().byte_size();
+    size_t young_gen_size_before = _young_gen->committed_size();
     size_t young_gen_size = _young_gen->compute_new_size();
 
-    // execution will continue with the existing heap generation sizes if resizing the VirtualSpace fails
-    bool success = _shared_virtual_space->resize(young_gen_size);
-    if (success) {
-      _young_gen->post_shared_virtual_space_resize(young_gen_size_before);
-      rem_set()->resize_covered_region_in_shared_virtual_space(_shared_virtual_space->tenured_region(),
-                                                            _shared_virtual_space->young_region());
+    if (young_gen_size != young_gen_size_before) {
+      // execution will continue with the existing heap generation sizes if resizing the VirtualSpace fails
+      bool success = _shared_virtual_space->resize(young_gen_size);
+      if (success) {
+        _young_gen->post_shared_virtual_space_resize(young_gen_size_before);
+        rem_set()->resize_covered_region_in_shared_virtual_space(_shared_virtual_space->tenured_region(),
+                                                                 _shared_virtual_space->young_region());
+      }
     }
   } else {
     _young_gen->resize();
