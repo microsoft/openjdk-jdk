@@ -1701,15 +1701,15 @@ static int _print_module(const char* fname, address base_address,
 // in case of error it checks if .dll/.so was built for the
 // same architecture as Hotspot is running on
 void * os::dll_load(const char *name, char *ebuf, int ebuflen) {
-  log_info(os)("attempting shared library load of %s", name);
+  log_info(os)("attempting shared library load of %s on thread %d", name, os::current_thread_id());
   void* result;
   JFR_ONLY(NativeLibraryLoadEvent load_event(name, &result);)
-  result = LoadLibrary(name);
+    result = LoadLibrary(name);
   if (result != nullptr) {
     Events::log_dll_message(nullptr, "Loaded shared library %s", name);
     // Recalculate pdb search path if a DLL was loaded successfully.
     SymbolEngine::recalc_search_path();
-    log_info(os)("shared library load of %s was successful", name);
+    log_info(os)("shared library load of %s on thread %d was successful", name, os::current_thread_id());
     return result;
   }
   DWORD errcode = GetLastError();
@@ -1718,7 +1718,7 @@ void * os::dll_load(const char *name, char *ebuf, int ebuflen) {
   lasterror(ebuf, (size_t) ebuflen);
   ebuf[ebuflen - 1] = '\0';
   Events::log_dll_message(nullptr, "Loading shared library %s failed, error code %lu", name, errcode);
-  log_info(os)("shared library load of %s failed, error code %lu", name, errcode);
+  log_info(os)("shared library load of %s on thread %d failed, error code %lu", name, os::current_thread_id(), errcode);
 
   if (errcode == ERROR_MOD_NOT_FOUND) {
     strncpy(ebuf, "Can't find dependent libraries", ebuflen - 1);
@@ -2671,10 +2671,10 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
         // Fatal red zone violation.
         overflow_state->disable_stack_red_zone();
         tty->print_raw_cr("An unrecoverable stack overflow has occurred.");
-#if !defined(USE_VECTORED_EXCEPTION_HANDLING)
+//#if !defined(USE_VECTORED_EXCEPTION_HANDLING)
         report_error(t, exception_code, pc, exception_record,
                       exceptionInfo->ContextRecord);
-#endif
+//#endif
         return EXCEPTION_CONTINUE_SEARCH;
       }
     } else if (exception_code == EXCEPTION_ACCESS_VIOLATION) {
@@ -2726,10 +2726,10 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
       }
 
       // Stack overflow or null pointer exception in native code.
-#if !defined(USE_VECTORED_EXCEPTION_HANDLING)
-      report_error(t, exception_code, pc, exception_record,
+//#if !defined(USE_VECTORED_EXCEPTION_HANDLING)
+        report_error(t, exception_code, pc, exception_record,
                    exceptionInfo->ContextRecord);
-#endif
+//#endif
       return EXCEPTION_CONTINUE_SEARCH;
     } // /EXCEPTION_ACCESS_VIOLATION
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2833,6 +2833,10 @@ LONG WINAPI topLevelVectoredExceptionFilter(struct _EXCEPTION_POINTERS* exceptio
   // to our normal exception handler.
   CodeBlob* cb = CodeCache::find_blob(pc);
   if (cb != nullptr) {
+    return topLevelExceptionFilter(exceptionInfo);
+  }
+
+  if (AlwaysRunTopLevelExceptionFilter) {
     return topLevelExceptionFilter(exceptionInfo);
   }
 
@@ -4460,6 +4464,12 @@ jint os::init_2(void) {
   bool schedules_all_processor_groups = win32::is_windows_11_or_greater() || win32::is_windows_server_2022_or_greater();
   log_debug(os)(schedules_all_processor_groups ? auto_schedules_message : no_auto_schedules_message);
   log_debug(os)("%d logical processors found.", processor_count());
+
+#pragma warning(push)
+#pragma warning(disable : 5048)
+  // warning C5048: Use of macro '__DATE__' may result in non-deterministic output
+  log_debug(os)("Debugging missing crashdumps: " __DATE__ " " __TIME__);
+#pragma warning(pop)
 
   // This could be set any time but all platforms
   // have to set it the same so we have to mirror Solaris.

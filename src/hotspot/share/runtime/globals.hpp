@@ -1985,6 +1985,9 @@ const int ObjectAlignmentInBytes = 8;
   product(bool, ProfileExceptionHandlers, true,                             \
           "Profile exception handlers")                                     \
                                                                             \
+  product(bool, AlwaysRunTopLevelExceptionFilter, false,                    \
+          "Always execute the top level exception filter")                  \
+                                                                            \
   product(bool, AlwaysRecordEvolDependencies, true, EXPERIMENTAL,           \
                 "Unconditionally record nmethod dependencies on class "     \
                 "rewriting/transformation independently of the JVMTI "      \
