@@ -24,6 +24,7 @@
 
 #include "cds/cdsConfig.hpp"
 #include "cds/cds_globals.hpp"
+#include "cds/metaspaceShared.hpp"
 #include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/classLoaderHierarchyDCmd.hpp"
 #include "classfile/classLoaderStats.hpp"
@@ -164,6 +165,10 @@ void DCmd::register_dcmds(){
 
 #if INCLUDE_CDS
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<DumpSharedArchiveDCmd>(full_export, true, false));
+#endif // INCLUDE_CDS
+
+#if INCLUDE_CDS
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<AOTEndTrainingDCmd>(full_export, true, false));
 #endif // INCLUDE_CDS
 
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<NMTDCmd>(full_export, true, false));
@@ -984,6 +989,28 @@ void ClassesDCmd::execute(DCmdSource source, TRAPS) {
   VM_PrintClasses vmop(output(), _verbose.value());
   VMThread::execute(&vmop);
 }
+
+#if INCLUDE_CDS
+void AOTEndTrainingDCmd::execute(DCmdSource source, TRAPS) {
+  if (!CDSConfig::is_dumping_preimage_static_archive()) {
+    output()->print_cr("Error! Not a training run");
+    return;
+  }
+
+  if (!MetaspaceShared::is_recording_preimage_static_archive()) {
+    output()->print_cr("Error! Not recording");
+    return;
+  }
+
+  MetaspaceShared::preload_and_dump(THREAD);
+  if (!MetaspaceShared::is_recording_preimage_static_archive()) {
+    output()->print_cr("Training ended successfully");
+    return;
+  }
+
+  output()->print_cr("Error! Failed to end training");
+}
+#endif // INCLUDE_CDS
 
 #if INCLUDE_CDS
 #define DEFAULT_CDS_ARCHIVE_FILENAME "java_pid%p_<subcmd>.jsa"
