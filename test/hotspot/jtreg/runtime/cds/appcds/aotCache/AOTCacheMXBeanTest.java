@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2025, Microsoft, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -79,11 +79,7 @@ public class AOTCacheMXBeanTest {
             if (runMode.isApplicationExecuted()) {
                 out.shouldContain("Hello Leyden " + name);
                 if(runMode == RunMode.TRAINING) {
-                    if (false) {
-                        out.shouldContain("AOTMode = auto");
-                    } else {
-                        out.shouldContain("AOTMode = record");
-                    }
+                    out.shouldContain("AOTMode = record");
                     out.shouldContain("Confirmed is recording");
                     out.shouldContain("Confirmed recording duration > 0");
                     out.shouldContain("Stopped recording successfully after an additional 10ms");
@@ -93,11 +89,7 @@ public class AOTCacheMXBeanTest {
                 } else if (runMode == RunMode.ASSEMBLY) {
                     out.shouldNotContain("Hello Leyden ");
                 } else if (runMode == RunMode.PRODUCTION) {
-                    if (false) {
-                        out.shouldContain("AOTMode = auto");
-                    } else {
-                        out.shouldContain("AOTMode = on");
-                    }
+                    out.shouldContain("AOTMode = on");
                     out.shouldContain("Confirmed is not recording");
                     out.shouldContain("Confirmed recording duration == 0");
                 }
