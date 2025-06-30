@@ -2671,10 +2671,8 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
         // Fatal red zone violation.
         overflow_state->disable_stack_red_zone();
         tty->print_raw_cr("An unrecoverable stack overflow has occurred.");
-#if !defined(USE_VECTORED_EXCEPTION_HANDLING)
         report_error(t, exception_code, pc, exception_record,
                       exceptionInfo->ContextRecord);
-#endif
         return EXCEPTION_CONTINUE_SEARCH;
       }
     } else if (exception_code == EXCEPTION_ACCESS_VIOLATION) {
@@ -2726,10 +2724,8 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
       }
 
       // Stack overflow or null pointer exception in native code.
-#if !defined(USE_VECTORED_EXCEPTION_HANDLING)
       report_error(t, exception_code, pc, exception_record,
                    exceptionInfo->ContextRecord);
-#endif
       return EXCEPTION_CONTINUE_SEARCH;
     } // /EXCEPTION_ACCESS_VIOLATION
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2802,28 +2798,7 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
 
 #if defined(USE_VECTORED_EXCEPTION_HANDLING)
 LONG WINAPI topLevelVectoredExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
-  PEXCEPTION_RECORD exceptionRecord = exceptionInfo->ExceptionRecord;
-#if defined(_M_ARM64)
-  address pc = (address) exceptionInfo->ContextRecord->Pc;
-#elif defined(_M_AMD64)
-  address pc = (address) exceptionInfo->ContextRecord->Rip;
-#else
-  #error unknown architecture
-#endif
-
-  // Fast path for code part of the code cache
-  if (CodeCache::low_bound() <= pc && pc < CodeCache::high_bound()) {
-    return topLevelExceptionFilter(exceptionInfo);
-  }
-
-  // If the exception occurred in the codeCache, pass control
-  // to our normal exception handler.
-  CodeBlob* cb = CodeCache::find_blob(pc);
-  if (cb != nullptr) {
-    return topLevelExceptionFilter(exceptionInfo);
-  }
-
-  return EXCEPTION_CONTINUE_SEARCH;
+  return topLevelExceptionFilter(exceptionInfo);
 }
 #endif
 
