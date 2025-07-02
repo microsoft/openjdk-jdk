@@ -2797,12 +2797,6 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
 }
 
 #if defined(USE_VECTORED_EXCEPTION_HANDLING)
-LONG WINAPI topLevelVectoredExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
-  return topLevelExceptionFilter(exceptionInfo);
-}
-#endif
-
-#if defined(USE_VECTORED_EXCEPTION_HANDLING)
 LONG WINAPI topLevelUnhandledExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
   if (!InterceptOSException) {
     DWORD exceptionCode = exceptionInfo->ExceptionRecord->ExceptionCode;
@@ -4430,7 +4424,7 @@ jint os::init_2(void) {
   // Setup Windows Exceptions
 
 #if defined(USE_VECTORED_EXCEPTION_HANDLING)
-  topLevelVectoredExceptionHandler = AddVectoredExceptionHandler(1, topLevelVectoredExceptionFilter);
+  topLevelVectoredExceptionHandler = AddVectoredExceptionHandler(1, topLevelExceptionFilter);
   previousUnhandledExceptionFilter = SetUnhandledExceptionFilter(topLevelUnhandledExceptionFilter);
 #endif
 
