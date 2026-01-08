@@ -21,7 +21,7 @@
  * questions.
  */
 
-#if defined(AARCH64) && !defined(ZERO)
+#if defined(AARCH64) && !defined(ZERO) && !defined(_WINDOWS)
 
 #include "utilities/spinYield.hpp"
 #include "unittest.hpp"
