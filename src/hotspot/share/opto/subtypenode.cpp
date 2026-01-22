@@ -177,7 +177,10 @@ bool SubTypeCheckNode::verify(PhaseGVN* phase) {
       return true;
     }
     const Type* cached_t = Value(phase); // cache the type to validate consistency
-    switch (C->static_subtype_check(superk, subk)) {
+    // Use skip=false to match the call in SubTypeCheckNode::sub().  This
+    // ensures that `verify()` and `Value()` take consistent code paths
+    // regardless of the value of the JVM flag `StressReflectiveCode`.
+    switch (C->static_subtype_check(superk, subk, false)) {
       case Compile::SSC_easy_test: {
         return verify_helper(phase, load_klass(phase), cached_t);
       }
