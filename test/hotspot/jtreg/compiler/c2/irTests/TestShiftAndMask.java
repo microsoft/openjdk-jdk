@@ -638,4 +638,72 @@ public class TestShiftAndMask {
             throw new RuntimeException("incorrect result: " + res);
         }
     }
+
+    @Test
+    @Arguments(values = Argument.RANDOM_EACH)
+    @IR(failOn = {IRNode.AND_I})
+    @IR(counts = {IRNode.LSHIFT_I, "1"})
+    public int shiftLeftWithLowMaskInt(int x) {
+      return (x << INT_MASK_WIDTH) &
+          (-1 << INT_MASK_WIDTH); // transformed to: return x << INT_MASK_WIDTH;
+    }
+
+    @Test
+    @Arguments(values = Argument.RANDOM_EACH)
+    @IR(failOn = {IRNode.AND_L})
+    @IR(counts = {IRNode.LSHIFT_L, "1"})
+    public long shiftLeftWithLowMaskLong(long x) {
+      return (x << LONG_MASK_WIDTH) &
+          (-1
+           << LONG_MASK_WIDTH); // transformed to: return x << LONG_MASK_WIDTH;
+    }
+
+    @Test
+    @Arguments(values = Argument.RANDOM_EACH)
+    @IR(failOn = {IRNode.AND_I})
+    @IR(counts = {IRNode.LSHIFT_I, "1"})
+    public static int shiftLeftWithLowMaskIntReversed(int x) {
+      return (-1 << INT_MASK_WIDTH) &
+          (x << INT_MASK_WIDTH); // transformed to: return x << INT_MASK_WIDTH;
+    }
+
+    @Test
+    @Arguments(values = Argument.RANDOM_EACH)
+    @IR(failOn = {IRNode.AND_L})
+    @IR(counts = {IRNode.LSHIFT_L, "1"})
+    public static long shiftLeftWithLowMaskLongReversed(long x) {
+      return (-1 << LONG_MASK_WIDTH) &
+          (x
+           << LONG_MASK_WIDTH); // transformed to: return x << LONG_MASK_WIDTH;
+    }
+
+    @Test
+    @Arguments(values = Argument.RANDOM_EACH)
+    @IR(counts = {IRNode.AND_I, "1"})
+    public int andMaskNonNegativeInt(int x) {
+        return (x & 0x7FFF) & 0xFFFF; // transformed to: return x & 0x7FFF;
+    }
+
+    @Test
+    @Arguments(values = Argument.RANDOM_EACH)
+    @IR(counts = {IRNode.AND_L, "1"})
+    public long andMaskNonNegativeLong(long x) {
+        return (x & 0x7FFFL) & 0xFFFFL; // transformed to: return x & 0x7FFFL;
+    }
+
+    @Test
+    @Arguments(values = Argument.RANDOM_EACH)
+    @IR(failOn = {IRNode.AND_I})
+    @IR(counts = {IRNode.URSHIFT_I, "1"})
+    public int andAfterURShiftInt(int x) {
+        return (x >>> 8) & 0x00FFFFFF; // transformed to return x >>> 8;
+    }
+
+    @Test
+    @Arguments(values = Argument.RANDOM_EACH)
+    @IR(failOn = {IRNode.AND_L})
+    @IR(counts = {IRNode.URSHIFT_L, "1"})
+    public long andAfterURShiftLong(long x) {
+        return (x >>> 16) & 0x0000FFFFFFFFFFFFL; // transformed to return x >>> 16;
+    }
 }
