@@ -632,12 +632,12 @@ public:
   void push(Node* def_mem_state, Node* use_mem_state) {
     if (use_mem_state->is_MergeMem()) {
       // Be sure we don't get into combinatorial problems.
-      Node *mergeMem = use_mem_state->as_MergeMem();
-      if (_worklist_visited.member(mergeMem)) {
+      Node *merge_mem = use_mem_state->as_MergeMem();
+      if (_worklist_visited.member(merge_mem)) {
         // already on work list; do not repeat
         return;
       }
-      _worklist_visited.push(mergeMem);
+      _worklist_visited.push(merge_mem);
     } else if (use_mem_state->is_Phi()) {
       // A Phi could have the same mem as input multiple times. If that's the case, we don't need to enqueue it
       // more than once. We otherwise allow phis to be repeated; they can merge two relevant states.
