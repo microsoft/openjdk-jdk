@@ -65,6 +65,7 @@ public class TestBadFormat {
         expectTestFormatException(BadInnerClassTest.class);
         expectTestFormatException(BadCompileClassInitializer.class, BadCompileClassInitializerHelper1.class,
                                   BadCompileClassInitializerHelper2.class, BadCompileClassInitializerHelper3.class);
+        expectTestFormatException(BadImpossibleConstraints.class);
     }
 
     /**
@@ -1292,6 +1293,32 @@ class BadCompileClassInitializerHelper2 {
 @ForceCompileClassInitializer
 class BadCompileClassInitializerHelper3 {
     // no <clinit>
+}
+
+class BadImpossibleConstraints {
+    @Test
+    @FailCount(1)
+    @Arguments(values = {Argument.NUMBER_42})
+    @IR(failOn = IRNode.SUB, counts = {IRNode.SUB, "1"})
+    public int conflictingFailOnAndCounts(int x) {
+        return 2020 - x;
+    }
+
+    @Test
+    @FailCount(1)
+    @Arguments(values = {Argument.NUMBER_42})
+    @IR(failOn = IRNode.SUB, counts = {IRNode.SUB, ">0"})
+    public int conflictingFailOnAndPositiveCounts(int x) {
+        return 2020 - x;
+    }
+
+    @Test
+    @FailCount(1)
+    @Arguments(values = {Argument.NUMBER_42})
+    @IR(counts = {IRNode.SUB, "1", IRNode.SUB, ">2"})
+    public int conflictingCountsConstraints(int x) {
+        return 2020 - x;
+    }
 }
 
 class ClassNoDefaultConstructor {
