@@ -520,6 +520,8 @@ VtableBlob* VtableBlob::create(const char* name, int buffer_size) {
       // eventually.
       return nullptr;
     }
+
+    MACOS_AARCH64_ONLY(os::thread_wx_enable_write());
     blob = new (size) VtableBlob(name, size);
     CodeCache_lock->unlock();
   }
@@ -870,9 +872,10 @@ void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const
       return;
     }
     //
-    if (AdapterHandlerLibrary::contains(this)) {
+    if (is_adapter_blob()) {
       st->print_cr(INTPTR_FORMAT " is at code_begin+%d in an AdapterHandler", p2i(addr), (int)(addr - code_begin()));
       AdapterHandlerLibrary::print_handler_on(st, this);
+      return;
     }
     // the stubroutines are generated into a buffer blob
     StubCodeDesc* d = StubCodeDesc::desc_for(addr);

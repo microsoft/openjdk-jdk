@@ -958,7 +958,7 @@ void InterpreterMacroAssembler::lock_object(Register monitor, Register object) {
 
   assert_different_registers(header, tmp);
 
-  lightweight_lock(monitor, object, header, tmp, slow_case);
+  fast_lock(monitor, object, header, tmp, slow_case);
   b(done);
 
   bind(slow_case);
@@ -987,7 +987,7 @@ void InterpreterMacroAssembler::unlock_object(Register monitor) {
   // The object address from the monitor is in object.
   ld(object, in_bytes(BasicObjectLock::obj_offset()), monitor);
 
-  lightweight_unlock(object, header, slow_case);
+  fast_unlock(object, header, slow_case);
 
   b(free_slot);
 
@@ -1109,11 +1109,11 @@ void InterpreterMacroAssembler::verify_method_data_pointer() {
   lhz(R11_scratch1, in_bytes(DataLayout::bci_offset()), R28_mdx);
   ld(R12_scratch2, in_bytes(Method::const_offset()), R19_method);
   addi(R11_scratch1, R11_scratch1, in_bytes(ConstMethod::codes_offset()));
-  add(R11_scratch1, R12_scratch2, R12_scratch2);
+  add(R11_scratch1, R11_scratch1, R12_scratch2);
   cmpd(CR0, R11_scratch1, R14_bcp);
   beq(CR0, verify_continue);
 
-  call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::verify_mdp ), R19_method, R14_bcp, R28_mdx);
+  call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::verify_mdp), R19_method, R14_bcp, R28_mdx);
 
   bind(verify_continue);
 #endif
