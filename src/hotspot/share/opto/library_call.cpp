@@ -992,7 +992,14 @@ Node* LibraryCallKit::current_thread_helper(Node*& tls_output, ByteSize handle_o
       : make_load(nullptr, p, p->bottom_type()->is_ptr(), T_ADDRESS, MemNode::unordered));
   thread_obj_handle = _gvn.transform(thread_obj_handle);
 
-  DecoratorSet decorators = IN_NATIVE;
+  // OopHandle stores uncompressed oops in native memory.
+  // Use IN_NATIVE to ensure proper handling without compressed oop decoding.
+  // Use MO_ACQUIRE so that subsequent loads (e.g. Thread.cont used by
+  // Continuation.yield) cannot float above this load on weakly-ordered
+  // architectures such as AArch64.  Without acquire semantics the hardware
+  // may reorder a later field load before the OopHandle dereference,
+  // observing a stale value after a virtual thread migrates between carriers.
+  DecoratorSet decorators = IN_NATIVE | MO_ACQUIRE;
   if (is_immutable) {
     decorators |= C2_IMMUTABLE_MEMORY;
   }

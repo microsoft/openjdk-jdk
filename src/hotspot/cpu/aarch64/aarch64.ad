@@ -6815,6 +6815,25 @@ instruct loadP(iRegPNoSp dst, memory8 mem)
   ins_pipe(iload_reg_mem);
 %}
 
+// Load Pointer with acquire semantics (load + barrier for complex addressing)
+instruct loadP_acq(iRegPNoSp dst, memory8 mem)
+%{
+  match(Set dst (LoadP mem));
+  predicate(needs_acquiring_load(n) && (n->as_Load()->barrier_data() == 0));
+
+  ins_cost(4 * INSN_COST + VOLATILE_REF_COST);
+  format %{ "ldr  $dst, $mem\t# ptr (acquire)\n\t"
+            "dmb ishld" %}
+
+  ins_encode %{
+    loadStore(masm, &MacroAssembler::ldr, $dst$$Register, $mem->opcode(),
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 8);
+    __ membar(Assembler::LoadLoad | Assembler::LoadStore);
+  %}
+
+  ins_pipe(pipe_serial);
+%}
+
 // Load Compressed Pointer
 instruct loadN(iRegNNoSp dst, memory4 mem)
 %{
@@ -6827,6 +6846,25 @@ instruct loadN(iRegNNoSp dst, memory4 mem)
   ins_encode(aarch64_enc_ldrw(dst, mem));
 
   ins_pipe(iload_reg_mem);
+%}
+
+// Load Compressed Pointer with acquire semantics (load + barrier for complex addressing)
+instruct loadN_acq(iRegNNoSp dst, memory4 mem)
+%{
+  match(Set dst (LoadN mem));
+  predicate(needs_acquiring_load(n) && n->as_Load()->barrier_data() == 0);
+
+  ins_cost(4 * INSN_COST + VOLATILE_REF_COST);
+  format %{ "ldrw  $dst, $mem\t# compressed ptr (acquire)\n\t"
+            "dmb ishld" %}
+
+  ins_encode %{
+    loadStore(masm, &MacroAssembler::ldrw, $dst$$Register, $mem->opcode(),
+               as_Register($mem$$base), $mem$$index, $mem$$scale, $mem$$disp, 4);
+    __ membar(Assembler::LoadLoad | Assembler::LoadStore);
+  %}
+
+  ins_pipe(pipe_serial);
 %}
 
 // Load Klass Pointer

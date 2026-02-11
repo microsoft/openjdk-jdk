@@ -3560,6 +3560,14 @@ const char* GraphBuilder::check_can_parse(ciMethod* callee) const {
 const char* GraphBuilder::should_not_inline(ciMethod* callee) const {
   if ( compilation()->directive()->should_not_inline(callee)) return "disallowed by CompileCommand";
   if ( callee->dont_inline())          return "don't inline by annotation";
+
+  // Don't inline a method that changes Thread.currentThread() except
+  // into another method that is annotated @ChangesCurrentThread.
+  if (callee->changes_current_thread()
+      && !compilation()->method()->changes_current_thread()) {
+    return "method changes current thread";
+  }
+
   return nullptr;
 }
 
