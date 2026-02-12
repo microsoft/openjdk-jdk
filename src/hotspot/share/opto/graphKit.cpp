@@ -1179,6 +1179,9 @@ Node* GraphKit::basic_plus_adr(Node* base, Node* ptr, Node* offset) {
   // short-circuit a common case
   if (offset == MakeConX(0))  return ptr;
 #ifdef ASSERT
+  // Both 32-bit and 64-bit zeros should have been handled by the previous `if`
+  // statement, so if we see either 32-bit or 64-bit zeros here, then we have a
+  // problem.
   if (offset->is_Con()) {
     const Type *t = offset->bottom_type();
     bool is_zero_int = t->isa_int() && t->is_int()->get_con() == 0;
