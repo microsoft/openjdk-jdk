@@ -32,11 +32,17 @@ import compiler.lib.ir_framework.*;
  *          peephole optimizer.
  * @library /test/lib /
  * @requires vm.debug == true & vm.compiler2.enabled
- * @requires os.arch == "x86_64" | os.arch == "amd64"
+ * @requires os.arch == "x86_64" | os.arch == "amd64" | os.arch == "aarch64"
  * @run driver compiler.c2.irTests.TestInterBlockRedundantFlagOps
  */
 public class TestInterBlockRedundantFlagOps {
     static volatile int sinkI;
+
+    // 4097 (0x1001) does not fit the aarch64 add/sub immediate encoding,
+    // forcing the instruction selector to use the general compX_reg_immX
+    // variants which materialize the constant into a scratch register.
+    static final int INT_NON_ADDSUB_IMM = 4097;
+    static final long LONG_NON_ADDSUB_IMM = 4097L;
 
     public static void main(String[] args) {
         TestFramework framework = new TestFramework();
@@ -48,8 +54,14 @@ public class TestInterBlockRedundantFlagOps {
 
     @Test
     @Arguments(values = {Argument.RANDOM_EACH, Argument.RANDOM_EACH})
-    @IR(counts = {"compI_rReg", "2"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "false"})
-    @IR(counts = {"compI_rReg", "1"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "true"})
+    @IR(counts = {"compI_rReg", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compI_rReg", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compI_reg_reg", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compI_reg_reg", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
     public static int testIntRegReg(int x, int y) {
         if (x < y) { sinkI = -1; return -1; }
         if (x > y) { sinkI = +1; return +1; }
@@ -58,11 +70,29 @@ public class TestInterBlockRedundantFlagOps {
 
     @Test
     @Arguments(values = {Argument.RANDOM_EACH})
-    @IR(counts = {"compI_rReg_imm", "2"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "false"})
-    @IR(counts = {"compI_rReg_imm", "1"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "true"})
+    @IR(counts = {"compI_rReg_imm", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compI_rReg_imm", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compI_reg_immIAddSub", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compI_reg_immIAddSub", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
     public static int testIntRegImm(int x) {
         if (x < 42) { sinkI = -1; return -1; }
         if (x > 42) { sinkI = +1; return +1; }
+        return 0;
+    }
+
+    @Test
+    @Arguments(values = {Argument.RANDOM_EACH})
+    @IR(counts = {"compI_reg_immI", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compI_reg_immI", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
+    public static int testIntRegImmLarge(int x) {
+        if (x < INT_NON_ADDSUB_IMM) { sinkI = -1; return -1; }
+        if (x > INT_NON_ADDSUB_IMM) { sinkI = +1; return +1; }
         return 0;
     }
 
@@ -70,12 +100,19 @@ public class TestInterBlockRedundantFlagOps {
     public void assertResults(int x, int y) {
         Asserts.assertEQ(Integer.compare(x, y), testIntRegReg(x, y));
         Asserts.assertEQ(Integer.compare(x, 42), testIntRegImm(x));
+        Asserts.assertEQ(Integer.compare(x, INT_NON_ADDSUB_IMM), testIntRegImmLarge(x));
     }
 
     @Test
     @Arguments(values = {Argument.RANDOM_EACH, Argument.RANDOM_EACH})
-    @IR(counts = {"compU_rReg", "2"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "false"})
-    @IR(counts = {"compU_rReg", "1"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "true"})
+    @IR(counts = {"compU_rReg", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compU_rReg", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compU_reg_reg", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compU_reg_reg", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
     public static int testUnsignedIntRegReg(int x, int y) {
         int cmp = Integer.compareUnsigned(x, y);
         if (cmp < 0) { sinkI = -1; return -1; }
@@ -85,10 +122,29 @@ public class TestInterBlockRedundantFlagOps {
 
     @Test
     @Arguments(values = {Argument.RANDOM_EACH})
-    @IR(counts = {"compU_rReg_imm", "2"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "false"})
-    @IR(counts = {"compU_rReg_imm", "1"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "true"})
+    @IR(counts = {"compU_rReg_imm", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compU_rReg_imm", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compU_reg_immIAddSub", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compU_reg_immIAddSub", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
     public static int testUnsignedIntRegImm(int x) {
         int cmp = Integer.compareUnsigned(x, 42);
+        if (cmp < 0) { sinkI = -1; return -1; }
+        if (cmp > 0) { sinkI = +1; return +1; }
+        return 0;
+    }
+
+    @Test
+    @Arguments(values = {Argument.RANDOM_EACH})
+    @IR(counts = {"compU_reg_immI", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compU_reg_immI", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
+    public static int testUnsignedIntRegImmLarge(int x) {
+        int cmp = Integer.compareUnsigned(x, INT_NON_ADDSUB_IMM);
         if (cmp < 0) { sinkI = -1; return -1; }
         if (cmp > 0) { sinkI = +1; return +1; }
         return 0;
@@ -98,12 +154,19 @@ public class TestInterBlockRedundantFlagOps {
     public void assertUnsignedResults(int x, int y) {
         Asserts.assertEQ(Integer.compareUnsigned(x, y), testUnsignedIntRegReg(x, y));
         Asserts.assertEQ(Integer.compareUnsigned(x, 42), testUnsignedIntRegImm(x));
+        Asserts.assertEQ(Integer.compareUnsigned(x, INT_NON_ADDSUB_IMM), testUnsignedIntRegImmLarge(x));
     }
 
     @Test
     @Arguments(values = {Argument.RANDOM_EACH, Argument.RANDOM_EACH})
-    @IR(counts = {"compL_rReg", "2"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "false"})
-    @IR(counts = {"compL_rReg", "1"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "true"})
+    @IR(counts = {"compL_rReg", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compL_rReg", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compL_reg_reg", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compL_reg_reg", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
     public static long testLongRegReg(long x, long y) {
         if (x < y) { sinkI = -1; return -1L; }
         if (x > y) { sinkI = +1; return +1L; }
@@ -112,11 +175,29 @@ public class TestInterBlockRedundantFlagOps {
 
     @Test
     @Arguments(values = {Argument.RANDOM_EACH})
-    @IR(counts = {"compL_rReg_imm", "2"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "false"})
-    @IR(counts = {"compL_rReg_imm", "1"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "true"})
+    @IR(counts = {"compL_rReg_imm", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compL_rReg_imm", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compL_reg_immLAddSub", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compL_reg_immLAddSub", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
     public static long testLongRegImm(long x) {
         if (x < 42L) { sinkI = -1; return -1L; }
         if (x > 42L) { sinkI = +1; return +1L; }
+        return 0L;
+    }
+
+    @Test
+    @Arguments(values = {Argument.RANDOM_EACH})
+    @IR(counts = {"compL_reg_immL", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compL_reg_immL", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
+    public static long testLongRegImmLarge(long x) {
+        if (x < LONG_NON_ADDSUB_IMM) { sinkI = -1; return -1L; }
+        if (x > LONG_NON_ADDSUB_IMM) { sinkI = +1; return +1L; }
         return 0L;
     }
 
@@ -124,12 +205,19 @@ public class TestInterBlockRedundantFlagOps {
     public void assertResults(long x, long y) {
         Asserts.assertEQ(Long.compare(x, y), testLongRegReg(x, y));
         Asserts.assertEQ(Long.compare(x, 42L), testLongRegImm(x));
+        Asserts.assertEQ(Long.compare(x, LONG_NON_ADDSUB_IMM), testLongRegImmLarge(x));
     }
 
     @Test
     @Arguments(values = {Argument.RANDOM_EACH, Argument.RANDOM_EACH})
-    @IR(counts = {"compUL_rReg", "2"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "false"})
-    @IR(counts = {"compUL_rReg", "1"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "true"})
+    @IR(counts = {"compUL_rReg", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compUL_rReg", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compUL_reg_reg", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compUL_reg_reg", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
     public static long testUnsignedLongRegReg(long x, long y) {
         int cmp = Long.compareUnsigned(x, y);
         if (cmp < 0) { sinkI = -1; return -1L; }
@@ -139,10 +227,29 @@ public class TestInterBlockRedundantFlagOps {
 
     @Test
     @Arguments(values = {Argument.RANDOM_EACH})
-    @IR(counts = {"compUL_rReg_imm", "2"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "false"})
-    @IR(counts = {"compUL_rReg_imm", "1"}, phase = CompilePhase.FINAL_CODE, applyIf = {"OptoPeephole", "true"})
+    @IR(counts = {"compUL_rReg_imm", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compUL_rReg_imm", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"x64", "true"})
+    @IR(counts = {"compUL_reg_immLAddSub", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compUL_reg_immLAddSub", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
     public static long testUnsignedLongRegImm(long x) {
         int cmp = Long.compareUnsigned(x, 42L);
+        if (cmp < 0) { sinkI = -1; return -1L; }
+        if (cmp > 0) { sinkI = +1; return +1L; }
+        return 0L;
+    }
+
+    @Test
+    @Arguments(values = {Argument.RANDOM_EACH})
+    @IR(counts = {"compUL_reg_immL", "2"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "false"}, applyIfPlatform = {"aarch64", "true"})
+    @IR(counts = {"compUL_reg_immL", "1"}, phase = CompilePhase.FINAL_CODE,
+        applyIf = {"OptoPeephole", "true"}, applyIfPlatform = {"aarch64", "true"})
+    public static long testUnsignedLongRegImmLarge(long x) {
+        int cmp = Long.compareUnsigned(x, LONG_NON_ADDSUB_IMM);
         if (cmp < 0) { sinkI = -1; return -1L; }
         if (cmp > 0) { sinkI = +1; return +1L; }
         return 0L;
@@ -152,5 +259,6 @@ public class TestInterBlockRedundantFlagOps {
     public void assertUnsignedResults(long x, long y) {
         Asserts.assertEQ((long) Long.compareUnsigned(x, y), testUnsignedLongRegReg(x, y));
         Asserts.assertEQ((long) Long.compareUnsigned(x, 42L), testUnsignedLongRegImm(x));
+        Asserts.assertEQ((long) Long.compareUnsigned(x, LONG_NON_ADDSUB_IMM), testUnsignedLongRegImmLarge(x));
     }
 }
