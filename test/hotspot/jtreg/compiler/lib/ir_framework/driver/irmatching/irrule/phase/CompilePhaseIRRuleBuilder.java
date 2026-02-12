@@ -84,10 +84,26 @@ public class CompilePhaseIRRuleBuilder {
             .map(constraint -> ((RawFailOnConstraint) constraint).nodeIdentifier())
             .collect(Collectors.toSet());
 
+        Set<String> nodesSeen = new HashSet<>();
+        Set<String> nodesWithEquality = new HashSet<>();
         Map<String, Long> nodeBitVectors = new HashMap<>();
+
         for (RawConstraint constraint : rawCountsConstraints) {
             RawCountsConstraint countsConstraint = (RawCountsConstraint) constraint;
             String nodeId = countsConstraint.nodeIdentifier();
+            if (countsConstraint.isEqualityConstraint()) {
+                nodesWithEquality.add(nodeId);
+            }
+
+            // This constraint is valid if the node ID was either never
+            // mentioned until now or if it was mentioned but never with an
+            // equality constraint.
+            boolean seenBefore = !nodesSeen.add(nodeId);
+            boolean valid = !seenBefore || !nodesWithEquality.contains(nodeId);
+            TestFormat.checkNoReport(valid,
+                "Redundant constraints: node \"" + nodeId + "\" has an " +
+                "equality constraint that already fully specifies the " +
+                "expected count; additional constraints are not allowed");
 
             // Check if the counts are incompatible with each other.  Since the
             // underlying logic uses bitvectors of length 64, false negatives

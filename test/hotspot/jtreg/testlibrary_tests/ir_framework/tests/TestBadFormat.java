@@ -1315,8 +1315,40 @@ class BadImpossibleConstraints {
     @Test
     @FailCount(1)
     @Arguments(values = {Argument.NUMBER_42})
-    @IR(counts = {IRNode.SUB, "1", IRNode.SUB, ">2"})
-    public int conflictingCountsConstraints(int x) {
+    @IR(counts = {IRNode.SUB, "5", IRNode.SUB, "4"})
+    public int conflictingCountsConstraintsEquals(int x) {
+        return 2020 - x;
+    }
+
+    @Test
+    @FailCount(1)
+    @Arguments(values = {Argument.NUMBER_42})
+    @IR(counts = {IRNode.SUB, ">10", IRNode.SUB, "<4"})
+    public int conflictingCountsConstraintsLessThan(int x) {
+        return 2020 - x;
+    }
+
+    @Test
+    @FailCount(1)
+    @Arguments(values = {Argument.NUMBER_42})
+    @IR(counts = {IRNode.SUB, ">10", IRNode.SUB, "<=4"})
+    public int conflictingCountsConstraintsLessThanOrEquals(int x) {
+        return 2020 - x;
+    }
+
+    @Test
+    @FailCount(1)
+    @Arguments(values = {Argument.NUMBER_42})
+    @IR(counts = {IRNode.SUB, "<4", IRNode.SUB, ">6"})
+    public int conflictingCountsConstraintsGreaterThan(int x) {
+        return 2020 - x;
+    }
+
+    @Test
+    @FailCount(1)
+    @Arguments(values = {Argument.NUMBER_42})
+    @IR(counts = {IRNode.SUB, "<4", IRNode.SUB, ">=6"})
+    public int conflictingCountsConstraintsGreaterThanOrEquals(int x) {
         return 2020 - x;
     }
 }

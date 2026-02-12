@@ -108,9 +108,16 @@ public class RawCountsConstraint implements RawConstraint {
         return rawIRNode.nodeIdentifier();
     }
 
+    public boolean isEqualityConstraint() {
+        return "=".equals(comparison.getComparator());
+    }
+
     public long toBitVector() {
         int value = comparison.getGivenValue();
         if (value > MAX_COUNT_FOR_BITVECTOR) {
+            System.out.println("WARNING: count value " + comparison.getComparator() +
+                               value + "\" exceeds " + MAX_COUNT_FOR_BITVECTOR +
+                               "; incompatible constraint detection is disabled for this node.");
             return -1L;
         }
 
