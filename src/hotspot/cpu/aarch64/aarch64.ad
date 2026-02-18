@@ -1163,6 +1163,7 @@ source_hpp %{
 #include "gc/shared/collectedHeap.hpp"
 #include "opto/addnode.hpp"
 #include "opto/convertnode.hpp"
+#include "peephole_aarch64.hpp"
 #include "runtime/objectMonitor.hpp"
 
 extern RegMask _ANY_REG32_mask;
@@ -16513,6 +16514,106 @@ instruct tlsLoadP(thread_RegP dst)
 //   match(Set dst (LoadI mem));
 // %}
 //
+
+// Inter-block redundant flag operation removal peepholes.
+// Removes redundant compare instructions at the start of a block when an
+// identical compare exists at the end of the single predecessor block.
+
+peephole
+%{
+  peepmatch (compI_reg_reg);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compI_reg_immI0);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compI_reg_immIAddSub);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compI_reg_immI);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compU_reg_reg);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compU_reg_immI0);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compU_reg_immIAddSub);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compU_reg_immI);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compL_reg_reg);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compL_reg_immL0);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compL_reg_immLAddSub);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compL_reg_immL);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compUL_reg_reg);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compUL_reg_immL0);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compUL_reg_immLAddSub);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
+
+peephole
+%{
+  peepmatch (compUL_reg_immL);
+  peepprocedure (inter_block_redundant_flag_ops);
+%}
 
 //----------SMARTSPILL RULES---------------------------------------------------
 // These must follow all instruction definitions as they use the names

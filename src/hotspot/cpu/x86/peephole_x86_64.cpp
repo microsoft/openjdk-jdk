@@ -25,6 +25,7 @@
 #ifdef COMPILER2
 
 #include "opto/addnode.hpp"
+#include "opto/windowopt.hpp"
 #include "peephole_x86_64.hpp"
 #include "adfiles/ad_x86.hpp"
 
@@ -381,6 +382,19 @@ bool Peephole::lea_coalesce_reg(Block* block, int block_index, PhaseCFG* cfg_, P
 bool Peephole::lea_coalesce_imm(Block* block, int block_index, PhaseCFG* cfg_, PhaseRegAlloc* ra_,
                                 MachNode* (*new_root)(), uint inst0_rule) {
   return lea_coalesce_helper(block, block_index, cfg_, ra_, new_root, inst0_rule, true);
+}
+
+// Removes redundant flag-setting operations at the start of a block when an
+// identical operation exists at the end of the single predecessor block. This
+// pattern commonly arises from switch statements and chained if-else
+// comparisons.
+bool Peephole::inter_block_redundant_flag_ops(Block* block, int block_index,
+                                              PhaseCFG* cfg_,
+                                              PhaseRegAlloc* ra_,
+                                              MachNode* (*new_root)(),
+                                              uint inst0_rule) {
+  return WindowOpt::inter_block_redundant_flag_ops(block, block_index, cfg_,
+                                                   ra_, new_root, inst0_rule);
 }
 
 #endif // COMPILER2
