@@ -43,6 +43,10 @@ if [ -z "$TESTCLASSES" ] ; then
      exit 1
 fi
 
+# Detect if running on Windows
+IS_WINDOWS=false
+case `uname -s` in CYGWIN*|MINGW*|MSYS*) IS_WINDOWS=true ;; esac
+
 case `uname -s` in
     Linux)
       # Need this to convert to the /.automount/... form which
@@ -84,7 +88,7 @@ failIfNot()
     # $1 is the expected number of occurances of $2 in the jdb output.
     count=$1
     shift
-    if [ -r c:/ ] ; then
+    if [ "$IS_WINDOWS" = "true" ] ; then
        sed -e 's@\\@/@g' $tmpResult > $tmpResult.1
        mv $tmpResult.1 $tmpResult
     fi
@@ -177,7 +181,7 @@ mkFiles $HOME/.jdbrc $here/jdb.ini
     clean
 
 
-if [ ! -r c:/ ] ; then
+if [ "$IS_WINDOWS" != "true" ] ; then
     # No symlinks on windows.
     echo
     echo "+++++++++++++++++++++++++++++++++++"
@@ -191,7 +195,7 @@ if [ ! -r c:/ ] ; then
 fi
 
 
-if [ ! -r c:/ ] ; then
+if [ "$IS_WINDOWS" != "true" ] ; then
     # No symlinks on windows.
     echo
     echo "+++++++++++++++++++++++++++++++++++"
