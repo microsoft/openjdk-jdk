@@ -43,15 +43,31 @@ void VM_Version::get_os_cpu_info() {
   if (IsProcessorFeaturePresent(PF_ARM_V8_CRC32_INSTRUCTIONS_AVAILABLE)) {
     set_feature(CPU_CRC32);
   }
+
   if (IsProcessorFeaturePresent(PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE)) {
     set_feature(CPU_AES);
     set_feature(CPU_SHA1);
     set_feature(CPU_SHA2);
+    set_feature(CPU_PMULL);
   }
+
   if (IsProcessorFeaturePresent(PF_ARM_VFP_32_REGISTERS_AVAILABLE)) {
     set_feature(CPU_ASIMD);
   }
-  // No check for CPU_PMULL, CPU_SVE, CPU_SVE2
+
+  if (IsProcessorFeaturePresent(PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE)) {
+    set_feature(CPU_LSE);
+  }
+
+  if (IsProcessorFeaturePresent(PF_ARM_SHA3_INSTRUCTIONS_AVAILABLE)) {
+    set_feature(CPU_SHA3);
+  }
+
+  if (IsProcessorFeaturePresent(PF_ARM_SHA512_INSTRUCTIONS_AVAILABLE)) {
+    set_feature(CPU_SHA512);
+  }
+
+  // No check for DCPOP, SB, PACA, A53MAC
 
   __int64 dczid_el0 = _ReadStatusReg(0x5807 /* ARM64_DCZID_EL0 */);
 
