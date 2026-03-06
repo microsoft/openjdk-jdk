@@ -784,6 +784,14 @@ AC_DEFUN([FLAGS_SETUP_CFLAGS_CPU_DEP],
   elif test "x$TOOLCHAIN_TYPE" = xmicrosoft; then
     if test "x$FLAGS_CPU" = xx86; then
       $1_CFLAGS_CPU_JVM="-arch:IA32"
+    elif test "x$FLAGS_CPU" = xaarch64; then
+      # MSVC defaults to /volatile:iso on ARM64, which makes volatile reads/writes
+      # plain LDR/STR with no acquire/release barriers. HotSpot's C++ runtime code
+      # was written assuming volatile provides acquire/release semantics (as on x86
+      # and GCC/Clang AArch64). Use /volatile:ms to restore those semantics and
+      # prevent memory ordering bugs in ObjectMonitor, ParkEvent, and other
+      # lock-free algorithms that use plain volatile fields.
+      $1_CFLAGS_CPU_JVM="-volatile:ms"
     elif test "x$OPENJDK_TARGET_CPU" = xx86_64; then
       if test "x$DEBUG_LEVEL" != xrelease; then
         # NOTE: This is probably redundant; -homeparams is default on
