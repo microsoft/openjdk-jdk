@@ -22,6 +22,7 @@
  *
  */
 
+// touch to get a baseline
 #include "classfile/vmSymbols.hpp"
 #include "gc/shared/oopStorage.hpp"
 #include "gc/shared/oopStorageSet.hpp"
