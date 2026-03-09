@@ -590,6 +590,11 @@ public class LinkedTransferQueue<E> extends AbstractQueue<E>
                 q = p.next;
                 if (p.isData != haveData && haveData != (m != null)) {
                     if (p.cmpExItem(m, e) == m) {
+                        // Full fence (StoreLoad) for Dekker with await() which
+                        // writes waiter then reads item. On ARM64, CAS
+                        // (ldaxr/stlxr) + plain load to a different field does
+                        // NOT provide StoreLoad ordering.
+                        VarHandle.fullFence();
                         Thread w = p.waiter; // matched complementary node
                         if (p != h && h == cmpExHead(h, (q == null) ? p : q))
                             h.next = h;     // advance head; self-link old

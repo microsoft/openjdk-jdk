@@ -177,6 +177,11 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
                     else if (p.cmpExItem(m, e) != m)
                         p = head;                  // missed; restart
                     else {                         // matched complementary node
+                        // Full fence (StoreLoad) for Dekker with await() which
+                        // writes waiter then reads item. On ARM64, CAS
+                        // (ldaxr/stlxr) + plain load to a different field does
+                        // NOT provide StoreLoad ordering.
+                        VarHandle.fullFence();
                         Thread w = p.waiter;
                         cmpExHead(p, p.next);
                         LockSupport.unpark(w);
