@@ -1379,7 +1379,14 @@ void LIRGenerator::do_JavaThreadField(Intrinsic* x, ByteSize offset) {
   LIR_Opr temp = new_register(T_ADDRESS);
   LIR_Opr reg = rlock_result(x);
   __ move(new LIR_Address(getThreadPointer(), in_bytes(offset), T_ADDRESS), temp);
-  access_load(IN_NATIVE, T_OBJECT,
+  // OopHandle stores uncompressed oops in native memory.
+  // Use IN_NATIVE to ensure a raw 64-bit load without compressed oop handling.
+  // Use MO_ACQUIRE so that subsequent loads (e.g. Thread.cont used by
+  // Continuation.yield) cannot float above this load on weakly-ordered
+  // architectures such as AArch64.  Without acquire semantics the hardware
+  // may reorder a later field load before the OopHandle dereference,
+  // observing a stale value after a virtual thread migrates between carriers.
+  access_load(IN_NATIVE | MO_ACQUIRE, T_OBJECT,
               LIR_OprFact::address(new LIR_Address(temp, T_OBJECT)), reg);
 }
 
