@@ -29,4 +29,20 @@ import java.util.concurrent.ForkJoinPool;
 public interface JavaUtilConcurrentFJPAccess {
     long beginCompensatedBlock(ForkJoinPool pool);
     void endCompensatedBlock(ForkJoinPool pool, long post);
+    /**
+     * Like beginCompensatedBlock but for carrier threads that are about to
+     * block on a native OS-level monitor (objectMonitor::enter_internal) while
+     * pinned by a virtual thread.  This variant:
+     * <ul>
+     *   <li>Never takes the passive RC-only path (branch 2 of tryCompensate);
+     *       it always activates an idle worker or creates a new spare.</li>
+     *   <li>Decrements RC immediately so that signalWork can create a carrier
+     *       for any continuation (e.g. the contested lock's holder) that is
+     *       already in the queue, which would otherwise be starved because
+     *       blocked carriers still count as active in RC.</li>
+     * </ul>
+     * The RC decrement is restored by endCompensatedBlock when the carrier
+     * unblocks.
+     */
+    long beginMonitorCompensatedBlock(ForkJoinPool pool);
 }

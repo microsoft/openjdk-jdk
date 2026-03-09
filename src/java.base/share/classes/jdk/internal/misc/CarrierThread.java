@@ -90,6 +90,47 @@ public class CarrierThread extends ForkJoinWorkerThread {
     }
 
     /**
+     * Mark the start of a blocking operation where the carrier thread is about
+     * to block on a native OS-level monitor (objectMonitor::enter_internal)
+     * while pinned by a virtual thread.  Unlike beginBlocking, this always
+     * activates an idle worker or creates a new spare carrier (never takes the
+     * passive RC-only path that creates no worker).  endBlocking restores
+     * the compensateValue (1 or 2 RC_UNITs) when this carrier unblocks.
+     */
+    public boolean beginMonitorBlock() {
+        assert Thread.currentThread().isVirtual() && JLA.currentCarrierThread() == this;
+
+        // Guard against re-entrant calls.  tryCompensateForMonitor may call
+        // createWorker() which can hit a nested monitor (e.g. ThreadGroup),
+        // re-entering objectMonitor::enter_with_contention_mark and thus this
+        // method.  Without this check each nested call overwrites
+        // compensateValue, leaking an RC_UNIT per re-entrant compensation.
+        if (compensating != NOT_COMPENSATING) {
+            return false;
+        }
+
+        // don't preempt when attempting to compensate
+        Continuation.pin();
+        try {
+            compensating = COMPENSATE_IN_PROGRESS;
+
+            // Uses FJP.tryCompensateForMonitor (branch 2 removed) – always
+            // activates an idle worker (1*RC_UNIT) or creates a new spare
+            // with RC-- (2*RC_UNIT to balance both the RC-- and the spare's
+            // eventual deactivation).
+            compensateValue = ForkJoinPools.beginMonitorCompensatedBlock(getPool());
+            compensating = COMPENSATING;
+            return true;
+        } catch (Throwable e) {
+            // exception starting spare thread
+            compensating = NOT_COMPENSATING;
+            throw e;
+        } finally {
+            Continuation.unpin();
+        }
+    }
+
+    /**
      * Mark the end of a blocking operation.
      */
     public void endBlocking() {
@@ -132,6 +173,9 @@ public class CarrierThread extends ForkJoinWorkerThread {
         }
         static void endCompensatedBlock(ForkJoinPool pool, long post) {
             FJP_ACCESS.endCompensatedBlock(pool, post);
+        }
+        static long beginMonitorCompensatedBlock(ForkJoinPool pool) {
+            return FJP_ACCESS.beginMonitorCompensatedBlock(pool);
         }
     }
 

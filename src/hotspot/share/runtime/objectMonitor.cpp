@@ -22,6 +22,7 @@
  *
  */
 
+#include "classfile/symbolTable.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "gc/shared/oopStorage.hpp"
 #include "gc/shared/oopStorageSet.hpp"
@@ -42,6 +43,7 @@
 #include "runtime/globals.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
+#include "runtime/javaCalls.hpp"
 #include "runtime/javaThread.inline.hpp"
 #include "runtime/mutexLocker.hpp"
 #include "runtime/objectMonitor.inline.hpp"
@@ -536,6 +538,90 @@ void ObjectMonitor::notify_contended_enter(JavaThread* current, bool post_jvmti_
   }
 }
 
+// Compensate the ForkJoinPool scheduler when a pinned virtual thread's
+// carrier is about to block on a contended monitor.  Without compensation
+// the pool has no visibility that its worker is blocked, which can lead to
+// carrier starvation / deadlock (JDK-8345294).
+//
+// This calls CarrierThread.beginMonitorBlock() which uses
+// ForkJoinPool.tryCompensateForMonitor() to (a) activate an idle worker or
+// create a replacement spare carrier, and (b) decrement RC so that signalWork
+// can find a carrier for any queued continuation (e.g. the VT holding the
+// contested lock) that would otherwise be starved because blocked carriers
+// still count as active in the pool's RC field.  The RC decrement is restored
+// by endCompensatedBlock when this carrier unblocks.
+//
+// IMPORTANT: At this point notify_contended_enter() has already set
+// _current_pending_monitor. The Java call below may itself trigger
+// nested monitor contention (e.g., ThreadGroup.addUnstarted acquires a
+// monitor when creating a spare worker thread).  To avoid:
+//   (a) assertion failures  (pending_monitor != nullptr on nested entry)
+//   (b) corruption of _current_pending_monitor for the outer monitor
+// we save and clear the pending monitor before the Java call and restore
+// it afterwards.
+static bool compensate_pinned_carrier(JavaThread* current) {
+  oop carrier = current->threadObj();
+  if (carrier == nullptr) return false;
+
+  // Save and clear pending monitor so nested monitor enters work cleanly.
+  ObjectMonitor* saved_pending = current->current_pending_monitor();
+  current->set_current_pending_monitor(nullptr);
+
+  HandleMark hm(current);
+  Handle carrier_h(current, carrier);
+  Klass* klass = carrier_h->klass();
+
+  // CarrierThread.beginMonitorBlock() — compensates the ForkJoinPool via
+  // tryCompensateForMonitor which always activates/creates a real spare
+  // carrier (branch 2 of tryCompensate is omitted for this path).
+  // Not every carrier thread is a CarrierThread (custom schedulers may
+  // use plain threads), so we look up the method and silently return
+  // false if it is not found.
+  TempNewSymbol begin_name = SymbolTable::new_symbol("beginMonitorBlock");
+  TempNewSymbol begin_sig  = SymbolTable::new_symbol("()Z");
+
+  JavaValue result(T_BOOLEAN);
+  JavaCalls::call_virtual(&result, carrier_h, klass,
+                          begin_name, begin_sig, current);
+
+  bool compensated = false;
+  if (current->has_pending_exception()) {
+    current->clear_pending_exception();
+  } else {
+    compensated = result.get_jboolean();
+  }
+
+  // Restore pending monitor for the outer monitor enter.
+  current->set_current_pending_monitor(saved_pending);
+  return compensated;
+}
+
+static void end_compensate_pinned_carrier(JavaThread* current) {
+  oop carrier = current->threadObj();
+  if (carrier == nullptr) return;
+
+  // Save and clear pending monitor (should be nullptr here, but be safe).
+  ObjectMonitor* saved_pending = current->current_pending_monitor();
+  current->set_current_pending_monitor(nullptr);
+
+  HandleMark hm(current);
+  Handle carrier_h(current, carrier);
+  Klass* klass = carrier_h->klass();
+
+  TempNewSymbol end_name = SymbolTable::new_symbol("endBlocking");
+  TempNewSymbol end_sig  = vmSymbols::void_method_signature();
+
+  JavaValue result(T_VOID);
+  JavaCalls::call_virtual(&result, carrier_h, klass,
+                          end_name, end_sig, current);
+
+  if (current->has_pending_exception()) {
+    current->clear_pending_exception();
+  }
+
+  current->set_current_pending_monitor(saved_pending);
+}
+
 void ObjectMonitor::enter_with_contention_mark(JavaThread* current, ObjectMonitorContentionMark &cm, bool post_jvmti_events) {
   assert(current == JavaThread::current(), "must be");
   assert(!has_owner(current), "must be");
@@ -583,6 +669,15 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread* current, ObjectMonito
     }
   }
 
+  // Compensate the ForkJoinPool before the carrier blocks so that the
+  // scheduler can spin up a replacement worker thread.  This prevents
+  // deadlocks where every carrier is pinned and waiting for a monitor
+  // held by an unmounted virtual thread that can never get a carrier.
+  bool compensated = false;
+  if (is_virtual) {
+    compensated = compensate_pinned_carrier(current);
+  }
+
   {
     // Change java thread status to indicate blocked on monitor enter.
     JavaThreadBlockedOnMonitorEnterState jtbmes(current, this);
@@ -618,6 +713,11 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread* current, ObjectMonito
 
     // We've just gotten past the enter-check-for-suspend dance and we now own
     // the monitor free and clear.
+  }
+
+  // End compensation now that the carrier is no longer blocked.
+  if (compensated) {
+    end_compensate_pinned_carrier(current);
   }
 
   assert(contentions() >= 0, "must not be negative: contentions=%d", contentions());
