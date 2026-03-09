@@ -782,6 +782,13 @@ public abstract class AbstractQueuedSynchronizer
                 Thread.onSpinWait();
             } else if (node.status == 0) {
                 node.status = WAITING;          // enable signal and recheck
+                // Full fence (StoreLoad) to ensure WAITING status is visible
+                // before re-reading state in tryAcquire/tryAcquireShared
+                // (Dekker pattern with releaseShared/release which writes
+                // state then reads node.status in signalNext).
+                // On ARM64, volatile write (stlr) + volatile read (ldar) to
+                // different addresses does NOT provide StoreLoad ordering.
+                U.fullFence();
             } else {
                 spins = postSpins = (byte)((postSpins << 1) | 1);
                 try {
@@ -1097,6 +1104,13 @@ public abstract class AbstractQueuedSynchronizer
      */
     public final boolean release(int arg) {
         if (tryRelease(arg)) {
+            // Full fence (StoreLoad) to ensure the state update from
+            // tryRelease is visible before reading node.status in signalNext
+            // (Dekker pattern: release writes state then reads status,
+            // acquire writes status then reads state).
+            // On ARM64, CAS (stlxr/release) + ldar to different addresses
+            // does NOT provide StoreLoad ordering.
+            U.fullFence();
             signalNext(head);
             return true;
         }
@@ -1184,6 +1198,8 @@ public abstract class AbstractQueuedSynchronizer
      */
     public final boolean releaseShared(int arg) {
         if (tryReleaseShared(arg)) {
+            // Full fence (StoreLoad) — see comment in release()
+            U.fullFence();
             signalNext(head);
             return true;
         }

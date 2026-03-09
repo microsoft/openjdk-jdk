@@ -579,6 +579,13 @@ final class VirtualThread extends BaseVirtualThread {
                 setState(newState = TIMED_PARKED);
             }
 
+            // Full fence (StoreLoad) to ensure the PARKED/TIMED_PARKED state
+            // is visible before reading parkPermit (Dekker pattern with
+            // unpark which writes parkPermit then reads state).
+            // Note: storeFence is insufficient — on ARM64 it only emits
+            // LoadStore+StoreStore (dmb ishst), not StoreLoad (dmb ish).
+            U.fullFence();
+
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(newState, UNPARKED)) {
                 // lazy submit if local queue is empty
@@ -604,6 +611,10 @@ final class VirtualThread extends BaseVirtualThread {
         if (s == BLOCKING) {
             setState(BLOCKED);
 
+            // Full fence (StoreLoad) for Dekker pattern with unblock
+            // which writes blockPermit then reads state.
+            U.fullFence();
+
             // may have been unblocked while blocking
             if (blockPermit && compareAndSetState(BLOCKED, UNBLOCKED)) {
                 // lazy submit if local queue is empty
@@ -619,6 +630,9 @@ final class VirtualThread extends BaseVirtualThread {
             boolean interruptible = interruptibleWait;
             if (s == WAITING) {
                 setState(newState = WAIT);
+                // Full fence (StoreLoad) for Dekker pattern with notify
+                // which writes notified then reads state.
+                U.fullFence();
                 // may have been notified while in transition
                 blocked = notified && compareAndSetState(WAIT, BLOCKED);
             } else {
@@ -635,6 +649,9 @@ final class VirtualThread extends BaseVirtualThread {
                     byte seqNo = ++timedWaitSeqNo;
                     timeoutTask = schedule(() -> waitTimeoutExpired(seqNo), timeout, MILLISECONDS);
                     setState(newState = TIMED_WAIT);
+                    // Full fence (StoreLoad) for Dekker pattern with notify
+                    // which writes notified then reads state.
+                    U.fullFence();
                     // May have been notified while in transition. This must be done while
                     // holding the monitor to avoid changing the state of a new timed wait call.
                     blocked = notified && compareAndSetState(TIMED_WAIT, BLOCKED);
@@ -674,6 +691,15 @@ final class VirtualThread extends BaseVirtualThread {
     private void afterDone(boolean notifyContainer) {
         assert carrierThread == null;
         setState(TERMINATED);
+
+        // Full fence (StoreLoad) to ensure the TERMINATED state is
+        // visible before reading notifyAllAfterTerminate (Dekker pattern
+        // with beforeJoin which writes notifyAllAfterTerminate then
+        // reads state). Without this, on ARM64 the volatile write of
+        // state and the subsequent volatile read can be reordered,
+        // causing a missed-wakeup where both sides miss each other's
+        // store.
+        U.fullFence();
 
         // notifyAll to wakeup any threads waiting for this thread to terminate
         if (notifyAllAfterTerminate) {
@@ -870,6 +896,10 @@ final class VirtualThread extends BaseVirtualThread {
      */
     private void unpark(boolean lazySubmit) {
         if (!getAndSetParkPermit(true) && currentThread() != this) {
+            // Full fence (StoreLoad) to ensure parkPermit=true is visible
+            // before reading state (Dekker pattern with afterYield PARKING
+            // path which writes state then reads parkPermit).
+            U.fullFence();
             int s = state();
 
             // unparked while parked
@@ -912,6 +942,7 @@ final class VirtualThread extends BaseVirtualThread {
     private void unblock() {
         assert !Thread.currentThread().isVirtual();
         blockPermit = true;
+        U.fullFence();  // Full fence (StoreLoad) for Dekker with afterYield BLOCKING path
         if (state() == BLOCKED && compareAndSetState(BLOCKED, UNBLOCKED)) {
             submitRunContinuation();
         }
