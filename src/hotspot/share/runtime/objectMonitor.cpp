@@ -2439,6 +2439,16 @@ bool ObjectMonitor::try_spin(JavaThread* current) {
   if (!has_successor()) {
     set_successor(current);
   }
+  // Dekker/Lamport duality with exit(): ST _succ; MEMBAR; LD _owner.
+  // The exiter's side (release_clear_owner + storeload) is in exit().
+  // Here on the spinner's side, we need a StoreLoad barrier between
+  // setting _succ and reading _owner to prevent the CPU from reordering
+  // the _owner load before the _succ store. On ARM64 with MSVC
+  // /volatile:iso, Atomic::store/load are plain STR/LDR with no
+  // barrier, so without this fence the Dekker protocol is broken and
+  // the exiter may not see our successor designation while we may not
+  // see its lock release — leading to missed wakeups and starvation.
+  OrderAccess::storeload();
   int64_t prv = NO_OWNER;
 
   // There are three ways to exit the following loop:
@@ -2514,6 +2524,8 @@ bool ObjectMonitor::try_spin(JavaThread* current) {
 
     if (!has_successor()) {
       set_successor(current);
+      // See Dekker/storeload comment before the loop.
+      OrderAccess::storeload();
     }
   }
 
