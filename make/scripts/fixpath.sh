@@ -88,7 +88,9 @@ function setup() {
   fi
 
   if [[ -z ${CMD+x} ]]; then
-    CMD="$DRIVEPREFIX/c/windows/system32/cmd.exe"
+    # Use SYSTEMROOT to find Windows directory regardless of drive letter
+    systemroot_unix="$($PATHTOOL -u "$SYSTEMROOT")"
+    CMD="$systemroot_unix/system32/cmd.exe"
   fi
 
   if [[ -z ${WINTEMP+x} ]]; then
