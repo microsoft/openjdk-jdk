@@ -114,6 +114,9 @@ public class ApplicableIRRulesPrinter {
         "apx_f",
         // AArch64
         "sha3",
+        "sha512",
+        "pmull",
+        "lse",
         "asimd",
         "sve",
         "sve2",
