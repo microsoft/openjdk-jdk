@@ -139,7 +139,10 @@ public class AllocationMergesTests {
                  "testString_two_C2",
                  "testLoadKlassFromCast_C2",
                  "testLoadKlassFromPhi_C2",
-                 "testReReduce_C2"
+                 "testReReduce_C2",
+                 "testInstanceOfNullMerge_C2",
+                 "testInstanceOfWithBinding_C2",
+                 "testInstanceOfWithoutBinding_C2",
                 })
     public void runner(RunInfo info) {
         invocations++;
@@ -197,6 +200,9 @@ public class AllocationMergesTests {
         Asserts.assertEQ(testLoadKlassFromCast_Interp(cond1),                       testLoadKlassFromCast_C2(cond1));
         Asserts.assertEQ(testLoadKlassFromPhi_Interp(cond1),                        testLoadKlassFromPhi_C2(cond1));
         Asserts.assertEQ(testReReduce_Interp(cond1, x, y),                          testReReduce_C2(cond1, x, y));
+        Asserts.assertEQ(testInstanceOfNullMerge_Interp(cond1, x),                  testInstanceOfNullMerge_C2(cond1, x));
+        Asserts.assertEQ(testInstanceOfWithBinding_Interp(cond1, x, y),             testInstanceOfWithBinding_C2(cond1, x, y));
+        Asserts.assertEQ(testInstanceOfWithoutBinding_Interp(cond1, x, y),          testInstanceOfWithoutBinding_C2(cond1, x, y));
 
         Asserts.assertEQ(testSRAndNSR_Trap_Interp(false, cond1, cond2, x, y),
                          testSRAndNSR_Trap_C2(info.isTestC2Compiled("testSRAndNSR_Trap_C2"), cond1, cond2, x, y));
@@ -1379,6 +1385,63 @@ public class AllocationMergesTests {
 
     @DontCompile
     int testReReduce_Interp(boolean cond1, int x, int y) { return testReReduce(cond1, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+    int testInstanceOfNullMerge(boolean cond, int x) {
+        Shape s = null;
+        if (cond) {
+            s = new Square(x);
+        }
+        if (s instanceof Square sq) {
+            return sq.l;
+        }
+        return 0;
+    }
+
+    @Test
+    @IR(failOn = { IRNode.ALLOC })
+    int testInstanceOfNullMerge_C2(boolean cond, int x) { return testInstanceOfNullMerge(cond, x); }
+
+    @DontCompile
+    int testInstanceOfNullMerge_Interp(boolean cond, int x) { return testInstanceOfNullMerge(cond, x); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+    int testInstanceOfWithBinding(boolean cond, int x, int y) {
+        Shape s = cond ? new Square(x) : new Circle(y);
+        if (s instanceof Square sq) {
+            return sq.l;
+        }
+        return s.l;
+    }
+
+    @Test
+    @IR(failOn = { IRNode.ALLOC })
+    int testInstanceOfWithBinding_C2(boolean cond, int x, int y) { return testInstanceOfWithBinding(cond, x, y); }
+
+    @DontCompile
+    int testInstanceOfWithBinding_Interp(boolean cond, int x, int y) { return testInstanceOfWithBinding(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+    int testInstanceOfWithoutBinding(boolean cond, int x, int y) {
+        Shape s = cond ? new Square(x) : new Circle(y);
+        if (s instanceof Square) {
+            return s.x;
+        }
+        return s.l;
+    }
+
+    @Test
+    @IR(failOn = { IRNode.ALLOC })
+    int testInstanceOfWithoutBinding_C2(boolean cond, int x, int y) { return testInstanceOfWithoutBinding(cond, x, y); }
+
+    @DontCompile
+    int testInstanceOfWithoutBinding_Interp(boolean cond, int x, int y) { return testInstanceOfWithoutBinding(cond, x, y); }
 
     // ------------------ Utility for Testing ------------------- //
 
