@@ -181,6 +181,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
                         // writes waiter then reads item. On ARM64, CAS
                         // (ldaxr/stlxr) + plain load to a different field does
                         // NOT provide StoreLoad ordering.
+                        // GHA Run 02
                         VarHandle.fullFence();
                         Thread w = p.waiter;
                         cmpExHead(p, p.next);
