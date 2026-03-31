@@ -72,9 +72,9 @@ function setup() {
 
   if [[ -z ${DRIVEPREFIX+x} ]]; then
     drive_letter="${SYSTEMROOT%%:*}"
-    drive_letter_lower="$(echo "$drive_letter" | tr 'A-Z' 'a-z')"
-    systemroot="$($PATHTOOL -u "$SYSTEMROOT")"
-    DRIVEPREFIX="${systemroot%%/${drive_letter_lower}/*}"
+    drive_letter_lower="$(echo "${drive_letter}" | tr 'A-Z' 'a-z')"
+    cyg_systemroot="$(${PATHTOOL} -u "${SYSTEMROOT}")"
+    DRIVEPREFIX="${cyg_systemroot%%/${drive_letter_lower}/*}"
   else
     if [[ $DRIVEPREFIX == "NONE" ]]; then
       DRIVEPREFIX=""
@@ -91,8 +91,8 @@ function setup() {
 
   if [[ -z ${CMD+x} ]]; then
     # Use SYSTEMROOT to find Windows directory regardless of drive letter
-    systemroot="$($PATHTOOL -u "$SYSTEMROOT")"
-    CMD="$systemroot/system32/cmd.exe"
+    cyg_systemroot="$(${PATHTOOL} -u "${SYSTEMROOT}")"
+    CMD="${cyg_systemroot}/system32/cmd.exe"
   fi
 
   if [[ -z ${WINTEMP+x} ]]; then
