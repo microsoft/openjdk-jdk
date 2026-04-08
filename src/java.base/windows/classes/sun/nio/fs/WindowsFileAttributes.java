@@ -107,6 +107,35 @@ class WindowsFileAttributes
     private static final short OFFSETOF_FIND_DATA_SIZELOW = 32;
     private static final short OFFSETOF_FIND_DATA_RESERVED0 = 36;
 
+    /*
+     * typedef struct _FILE_STAT_BASIC_INFORMATION {
+     *     LARGE_INTEGER FileId;                // 0
+     *     LARGE_INTEGER CreationTime;          // 8
+     *     LARGE_INTEGER LastAccessTime;        // 16
+     *     LARGE_INTEGER LastWriteTime;         // 24
+     *     LARGE_INTEGER ChangeTime;            // 32
+     *     LARGE_INTEGER AllocationSize;        // 40
+     *     LARGE_INTEGER EndOfFile;             // 48
+     *     ULONG         FileAttributes;        // 56
+     *     ULONG         ReparseTag;            // 60
+     *     ULONG         NumberOfLinks;         // 64
+     *     ULONG         DeviceType;            // 68
+     *     ULONG         DeviceCharacteristics; // 72
+     *     ULONG         Reserved;              // 76
+     *     LARGE_INTEGER VolumeSerialNumber;    // 80
+     *     FILE_ID_128   FileId128;             // 88
+     * } FILE_STAT_BASIC_INFORMATION;           // total: 104
+     */
+    static final short SIZEOF_STAT_BASIC_INFO = 104;
+    private static final short OFFSETOF_STAT_BASIC_INFO_CREATETIME      = 8;
+    private static final short OFFSETOF_STAT_BASIC_INFO_LASTACCESSTIME  = 16;
+    private static final short OFFSETOF_STAT_BASIC_INFO_LASTWRITETIME   = 24;
+    private static final short OFFSETOF_STAT_BASIC_INFO_ENDOFFILE       = 48;
+    private static final short OFFSETOF_STAT_BASIC_INFO_ATTRIBUTES      = 56;
+    private static final short OFFSETOF_STAT_BASIC_INFO_REPARSETAG      = 60;
+    private static final short OFFSETOF_STAT_BASIC_INFO_VOLSERIAL       = 80;
+    private static final short OFFSETOF_STAT_BASIC_INFO_FILEID128       = 88;
+
     // used to adjust values between Windows and java epochs
     private static final long WINDOWS_EPOCH_IN_MICROS = -11644473600000000L;
     private static final long WINDOWS_EPOCH_IN_100NS  = -116444736000000000L;
@@ -227,6 +256,39 @@ class WindowsFileAttributes
 
 
     /**
+     * Create a WindowsFileAttributes from a FILE_STAT_BASIC_INFORMATION structure
+     */
+    static WindowsFileAttributes fromStatBasicInfo(long address) {
+        int fileAttrs = unsafe.getInt(address + OFFSETOF_STAT_BASIC_INFO_ATTRIBUTES);
+        long creationTime = unsafe.getLong(address + OFFSETOF_STAT_BASIC_INFO_CREATETIME);
+        long lastAccessTime = unsafe.getLong(address + OFFSETOF_STAT_BASIC_INFO_LASTACCESSTIME);
+        long lastWriteTime = unsafe.getLong(address + OFFSETOF_STAT_BASIC_INFO_LASTWRITETIME);
+        long size = unsafe.getLong(address + OFFSETOF_STAT_BASIC_INFO_ENDOFFILE);
+        int reparseTag = isReparsePoint(fileAttrs) ?
+            unsafe.getInt(address + OFFSETOF_STAT_BASIC_INFO_REPARSETAG) : 0;
+
+        // VolumeSerialNumber is a LARGE_INTEGER, but Windows volume serial
+        // numbers are 32-bit values, so we take the low 32 bits.
+        int volSerialNumber = unsafe.getInt(address + OFFSETOF_STAT_BASIC_INFO_VOLSERIAL);
+
+        // FileId128: take the low 64 bits as two 32-bit halves for
+        // compatibility with the existing fileIndexHigh/fileIndexLow fields.
+        // On NTFS the upper 64 bits of FileId128 are zero.
+        int fileIndexLow = unsafe.getInt(address + OFFSETOF_STAT_BASIC_INFO_FILEID128);
+        int fileIndexHigh = unsafe.getInt(address + OFFSETOF_STAT_BASIC_INFO_FILEID128 + 4);
+
+        return new WindowsFileAttributes(fileAttrs,
+                                         creationTime,
+                                         lastAccessTime,
+                                         lastWriteTime,
+                                         size,
+                                         reparseTag,
+                                         volSerialNumber,
+                                         fileIndexHigh,
+                                         fileIndexLow);
+    }
+
+    /**
      * Allocates a native buffer for a WIN32_FIND_DATA structure
      */
     static NativeBuffer getBufferForFindData() {
@@ -328,6 +390,34 @@ class WindowsFileAttributes
                     return attrs;
                 } catch (WindowsException ignore) {
                     throw firstException;
+                }
+            }
+        }
+
+        // When ensureAccurateMetadata is true the GetFileAttributesEx fast
+        // path above is skipped, so this provides a handle-free alternative
+        // for non-reparse regular files.  When ensureAccurateMetadata is
+        // false, we only reach here for reparse-point entries (which will
+        // fall through since the API does not follow reparse points).
+        if (followLinks) {
+            try (NativeBuffer buffer =
+                NativeBuffers.getNativeBuffer(SIZEOF_STAT_BASIC_INFO)) {
+                long addr = buffer.address();
+                GetFileInformationByName(path.getPathForWin32Calls(),
+                                         FileStatBasicByNameInfo, addr,
+                                         SIZEOF_STAT_BASIC_INFO);
+                // `GetFileInformationByName()` does not follow reparse points.
+                // Instead it returns attributes of the directory entry itself.
+                // When `followLinks` is true and the entry is a reparse point,
+                // we need to open the file to get the target's attributes, so
+                // we fall through.
+                int fileAttrs = unsafe.getInt(addr + OFFSETOF_STAT_BASIC_INFO_ATTRIBUTES);
+                if (!isReparsePoint(fileAttrs)) {
+                    return fromStatBasicInfo(addr);
+                }
+            } catch (WindowsException exc) {
+                if (exc.lastError() != ERROR_NOT_SUPPORTED) {
+                    throw exc;
                 }
             }
         }
