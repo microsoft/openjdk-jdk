@@ -480,6 +480,16 @@ void PhaseChaitin::Register_Allocate() {
   if (C->failing()) {
     return;
   }
+
+  // If we notice live ranges of scalars that begin outside a vector loop that
+  // is executed frequently and has a high register pressure and if these scalar
+  // values occupy part of the vector register (e.g. for float/double scalars),
+  // then split these live ranges so that the vector loop has access to the
+  // entire vector register file.  Although this means that the scalars will
+  // have to be restored later, it is cheaper to spill and restore scalars once
+  // rather than spilling and restoring vectors in each iteration of the loop.
+  must_spill += spill_scalars_before_vector_loops();
+
   // If we have a guaranteed spill, might as well spill now
   if (must_spill) {
     if(!_lrg_map.max_lrg_id()) {
@@ -1219,6 +1229,88 @@ void PhaseChaitin::set_was_low() {
     assert(old_was_lo <= lrgs(i)._was_lo, "_was_lo may not decrease");
   }
 #endif
+}
+
+uint PhaseChaitin::spill_scalars_before_vector_loops() {
+  // We want to split live ranges only when the scalar values reside in vector
+  // registers, so we build a combined mask of all vector register classes.
+  // Later, we check if this mask overlaps with that of the scalar live range.
+  static const uint vector_reg_masks[] = {
+    Op_VecS, Op_VecD, Op_VecX, Op_VecY, Op_VecZ, Op_VecA
+  };
+
+  ResourceMark rm;
+  ResourceMark rm_masks(C->regmask_arena());
+  RegMask vector_regs(C->regmask_arena());
+
+  for (uint idx = 0; idx < ARRAY_SIZE(vector_reg_masks); idx++) {
+    const RegMask* vmask = Matcher::idealreg2regmask[vector_reg_masks[idx]];
+    if (vmask != nullptr) {
+      vector_regs.or_with(*vmask);
+    }
+  }
+
+  // Early return if couldn't find a combined vector mask.
+  if (vector_regs.is_empty()) {
+    return 0;
+  }
+
+  uint spill_count = 0;
+  GrowableArray<Block*> loop_headers;
+
+  // Collect all qualifying loop headers so that we can limit our analysis.
+  for (uint idx = 0; idx < _cfg.number_of_blocks(); idx++) {
+    Block* block = _cfg.get_block(idx);
+    if (block->_freg_pressure > Matcher::float_pressure_limit() &&
+        block->_freq >= _high_frequency_lrg &&
+        block->head()->is_Loop() &&
+        block->_loop != nullptr) {
+      loop_headers.push(block);
+    }
+  }
+
+  // Iterate over every qualifying loop header to determine if live ranges are
+  // defined inside or outside the loop before deciding whether to spill them.
+  for (int header_idx = 0; header_idx < loop_headers.length(); header_idx++) {
+    Block* loop_header = loop_headers.at(header_idx);
+    CFGLoop* loop = loop_header->_loop;
+    ResourceBitMap live_ranges_defined_in_loop(_lrg_map.max_lrg_id());
+
+    for (uint block_idx = 0; block_idx < _cfg.number_of_blocks(); block_idx++) {
+      Block* block = _cfg.get_block(block_idx);
+      if (loop->in_loop_nest(block)) {
+        for (uint node_idx = 0; node_idx < block->number_of_nodes(); node_idx++) {
+          Node* node = block->get_node(node_idx);
+          uint live_range_id = _lrg_map.live_range_id(node);
+          if (live_range_id != 0) {
+            live_ranges_defined_in_loop.set_bit(live_range_id);
+          }
+        }
+      }
+    }
+
+    // Check the live ranges that are live at the loop header and check if
+    // they're in `live_ranges_defined_in_loop`.
+    IndexSetIterator elements(_live->live(loop_header));
+    for (uint range_id = elements.next(); range_id != 0; range_id = elements.next()) {
+      LRG& live_range = lrgs(range_id);
+
+      // Ignore this live range if it's for a vector value, or if it does not
+      // occupy a vector register, or if it is expected to spill at the header,
+      // or if it is defined inside the loop.
+      if (live_range._is_vector || !live_range.mask().overlap(vector_regs) ||
+          live_range._must_spill == 1 || !live_range.alive() ||
+          live_ranges_defined_in_loop.at(range_id)) {
+        continue;
+      }
+
+      live_range._must_spill = 1;
+      live_range.set_reg(OptoReg::Name(LRG::SPILL_REG));
+      spill_count += 1;
+    }
+  }
+
+  return spill_count;
 }
 
 // Compute cost/area ratio, in case we spill.  Build the lo-degree list.

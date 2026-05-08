@@ -692,6 +692,11 @@ private:
   // coalescing, it should Simplify.  This call sets the was-lo-degree bit.
   void set_was_low();
 
+  // Force-spill scalar live ranges that are live across a high frequency, high
+  // register pressure vector loop and when the live ranges are defined outside
+  // the loop.
+  uint spill_scalars_before_vector_loops();
+
   // Init LRG caching of degree, numregs.  Init lo_degree list.
   void cache_lrg_info( );
 
