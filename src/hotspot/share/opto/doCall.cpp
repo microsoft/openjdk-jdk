@@ -22,6 +22,7 @@
  *
  */
 
+#include "ci/bcEscapeAnalyzer.hpp"
 #include "ci/ciCallSite.hpp"
 #include "ci/ciMethodHandle.hpp"
 #include "ci/ciSymbols.hpp"
@@ -541,6 +542,52 @@ static bool check_call_consistency(JVMState* jvms, CallGenerator* cg) {
 }
 #endif // ASSERT
 
+static bool return_is_not_null(ciMethod* callee, CallNode* call, Compile* C, PhaseGVN* gvn) {
+  if (callee == nullptr) {
+    return false;
+  }
+
+  BCEscapeAnalyzer* bcea = callee->get_bcea();
+  if (bcea == nullptr) {
+    return false;
+  }
+
+  bcea->copy_dependencies(C->dependencies());
+  if (bcea->is_return_allocated()) {
+    // The callee is known to return a not null value.
+    return true;
+  }
+
+  if (bcea->is_return_local()) {
+    // The callee returns one of its input arguments, so we find all
+    // args that may be returned and if they all are known to be not
+    // null, then we mark the return value as not null as well.
+
+    if (call == nullptr) {
+      return false;
+    }
+
+    // In addition to checking `is_return_local()`, we also need to check if we
+    // found at least one argument that may be returned because of conservative
+    // fallbacks in BCEA.  If we don't, then removing the null check can cause
+    // JVM crashes.
+    bool found = false;
+    uint arg_count = call->tf()->domain()->cnt() - TypeFunc::Parms;
+    for (uint idx = 0; idx < arg_count; idx++) {
+      if (bcea->is_arg_returned(idx)) {
+        found = true;
+        Node* arg = call->in(idx + TypeFunc::Parms);
+        if (gvn->type(arg)->maybe_null()) {
+          return false;
+        }
+      }
+    }
+    return found;
+  }
+
+  return false;
+}
+
 //------------------------------do_call----------------------------------------
 // Handle your basic call.  Inline if we can & want to, else just setup call.
 void Parse::do_call() {
@@ -816,6 +863,12 @@ void Parse::do_call() {
     }
     BasicType ct = ctype->basic_type();
     if (is_reference_type(ct)) {
+      // If the callee is not inlined, check whether bytecode escape analysis
+      // can prove that the return value is not null.  If callee is inlined,
+      // then C2 can infer whether the callee returns a non-null value.
+      if (!cg->is_inline() && return_is_not_null(cg->method(), cg->call_node(), C, &_gvn)) {
+        cast_not_null(peek());
+      }
       record_profiled_return_for_speculation();
     }
   }

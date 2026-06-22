@@ -287,8 +287,21 @@ void BCEscapeAnalyzer::invoke(StateInfo &state, Bytecodes::Code code, ciMethod* 
   }
   if (skip_callee) {
     TRACE_BCEA(3, tty->print_cr("[EA] skipping method %s::%s", holder->name()->as_utf8(), target->name()->as_utf8()));
-    for (i = 0; i < arg_size; i++) {
-      set_method_escape(state.raw_pop());
+    // If the callee is a constructor (`<init>`) and if the object (passed as
+    // the last argument to `<init>`) is freshly allocated, then the object is
+    // being initialized and is not escaping.
+    if (code == Bytecodes::_invokespecial && target->is_object_initializer()) {
+      for (i = 0; i < arg_size; i++) {
+        ArgumentMap arg = state.raw_pop();
+        bool fresh_object = i == arg_size - 1 && arg.contains_allocated();
+        if (!fresh_object) {
+          set_method_escape(arg);
+        }
+      }
+    } else {
+      for (i = 0; i < arg_size; i++) {
+        set_method_escape(state.raw_pop());
+      }
     }
     _unknown_modified = true;  // assume the worst since we don't analyze the called method
     return;
