@@ -55,7 +55,7 @@ SerialBlockOffsetTable::SerialBlockOffsetTable(MemRegion reserved,
 
   const bool initialized = _vs.initialize(rs, 0 /* committed_size */);
 
-  assert(initialized, "Should never fail when commmitted_size is 0");
+  assert(initialized, "Should never fail when committed_size is 0");
 
   _offset_base = (uint8_t*)(_vs.low_boundary() - (uintptr_t(reserved.start()) >> CardTable::card_shift()));
   resize(init_word_size);
