@@ -51,7 +51,7 @@ MemoryManager::MemoryManager(const char* name)
 int MemoryManager::add_pool(MemoryPool* pool) {
   int index = _num_pools;
   assert(index < MemoryManager::max_num_pools, "_num_pools exceeds the max");
-  if (index < MemoryManager::max_num_pools) {
+  if (0 <= index  && index < MemoryManager::max_num_pools) {
     _pools[index] = pool;
     _num_pools++;
   }
